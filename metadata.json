@@ -1,0 +1,6 @@
+{
+  "name": "Barge Loading Operations Dashboard",
+  "description": "Dasbor operasional pemantauan performa loading batubara, idle time jetty, analisis delay, dan produktivitas alat muat BLC dengan integrasi Google Sheets.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
