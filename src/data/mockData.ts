@@ -84,21 +84,55 @@ function generateYearlyMockData(): { base: BaseRecord[]; base2: Base2Record[] } 
       const formatIso = (d: Date) =>
         `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:00`;
 
+      const TUG_FLEET = [
+        'LEO POWER 2222', 'MBP 2212', 'MBP 2211', 'ELWOOD',
+        'TB. TRANS POWER 01', 'TB. MITRA BAHARI 08', 'TB. SAMUDRA RAYA', 'TB. BINTANG TIMUR'
+      ];
+      const REAL_BARGES = [
+        'ELO MARINE 9002', 'MBP 9008', 'MBP 9003', 'PIPPA',
+        'BG. KALIMANTAN 01', 'BG. PACIFIC STAR', 'BG. MEGA JAYA 03', 'BG. BORNEO COAL 05'
+      ];
+
+      const tb = TUG_FLEET[(month * 3 + trip) % TUG_FLEET.length];
+      const actualBg = REAL_BARGES[(month * 3 + trip) % REAL_BARGES.length];
+      const voyageNumber = `10${20 + trip}`;
+
       baseData.push({
-        BG: bg,
+        voyageNo: voyageNumber,
+        BG: actualBg,
         DD: dateStr,
-        'Ton/Rit': tonRit
+        'Ton/Rit': tonRit,
+        TB: tb
       });
 
+      // Rincian aktivitas persis kolom H s/d AA dari Google Sheet BASE2
       base2Data.push({
-        BG: bg,
+        voyageNo: voyageNumber,
+        TB: tb,
+        BG: actualBg,
         DD: dateStr,
+        actualDate: dateStr,
+        startTime: `${startHour}:00`,
+        endTime: `${(startHour + Math.ceil(totalBerthHours)) % 24}:00`,
         'Cast-in': formatIso(castInDate),
         Loading: loading,
         'Cast off': formatIso(castOffDate),
         Breakdown: breakdown,
         'Heavy Rain': heavyRain,
-        Waiting: waiting
+        Waiting: waiting,
+        shiftRest: 0.25,
+        surveyorTime: 0.33,
+        activityDetails: [
+          { rowNumber: 1, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour}:00`, endTime: `${startHour}:10`, activityName: 'Cast-in', category: 'Standby', durationHours: 0.17, durationFormatted: '0:10' },
+          { rowNumber: 2, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour}:10`, endTime: `${startHour}:20`, activityName: 'Initial draft survey', category: 'Surveyor', durationHours: 0.17, durationFormatted: '0:10' },
+          { rowNumber: 3, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour}:20`, endTime: `${startHour}:30`, activityName: 'Prepare Loading', category: 'Standby', durationHours: 0.17, durationFormatted: '0:10' },
+          { rowNumber: 4, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour}:30`, endTime: `${startHour + 2}:00`, activityName: 'Loading to Barge', category: 'Loading', durationHours: parseFloat((loading * 0.6).toFixed(2)), durationFormatted: `${Math.floor(loading * 0.6)}:${Math.round((loading * 0.6 % 1) * 60).toString().padStart(2, '0')}` },
+          { rowNumber: 5, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour + 2}:00`, endTime: `${startHour + 2}:15`, activityName: 'Change Shift', category: 'Shift / Rest', durationHours: 0.25, durationFormatted: '0:15' },
+          ...(breakdown > 0 ? [{ rowNumber: 6, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour + 2}:15`, endTime: `${startHour + 3}:00`, activityName: 'Breakdown', category: 'Breakdown' as const, durationHours: breakdown, durationFormatted: `${Math.floor(breakdown)}:${Math.round((breakdown % 1) * 60).toString().padStart(2, '0')}` }] : []),
+          ...(waiting > 0 ? [{ rowNumber: 7, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour + 3}:00`, endTime: `${startHour + 3}:45`, activityName: 'Waiting Cargo', category: 'Waiting' as const, durationHours: waiting, durationFormatted: `${Math.floor(waiting)}:${Math.round((waiting % 1) * 60).toString().padStart(2, '0')}` }] : []),
+          { rowNumber: 8, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour + 3}:45`, endTime: `${startHour + 4}:00`, activityName: 'Rest Time', category: 'Shift / Rest', durationHours: 0.25, durationFormatted: '0:15' },
+          { rowNumber: 9, voyageNo: voyageNumber, tb, bg: actualBg, loadingDate: dateStr, activityDate: dateStr, startTime: `${startHour + 4}:00`, endTime: `${startHour + Math.ceil(totalBerthHours)}:00`, activityName: 'Loading to Barge', category: 'Loading', durationHours: parseFloat((loading * 0.4).toFixed(2)), durationFormatted: `${Math.floor(loading * 0.4)}:${Math.round((loading * 0.4 % 1) * 60).toString().padStart(2, '0')}` }
+        ]
       });
     }
   }
