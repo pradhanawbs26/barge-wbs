@@ -72,46 +72,50 @@ export const GSheetsSettingsModal: React.FC<GSheetsSettingsModalProps> = ({
           {/* Status Alert */}
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${config.spreadsheetUrl ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
               <span className="font-semibold text-slate-700">Status Sumber:</span>
               <span className="text-slate-900 font-bold flex items-center gap-1">
-                🔒 Terkunci Permanen (Base Data)
+                {config.spreadsheetUrl ? '🟢 Terkoneksi' : '⚪ Belum Ada Link'}
               </span>
             </div>
-            <button
-              onClick={onResetCache}
-              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-            >
-              <RefreshCw className="w-3 h-3" />
-              Reset Cache (TTL 10m)
-            </button>
+            {onResetCache && (
+              <button
+                onClick={onResetCache}
+                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Reset Cache (TTL 10m)
+              </button>
+            )}
           </div>
 
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="text-slate-700 font-semibold">
-                URL Google Spreadsheet (Base Sumber Data)
+                URL Google Spreadsheet Operasional
               </label>
-              <button
-                type="button"
-                onClick={() => setUrl('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit')}
-                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold"
-              >
-                🔒 Gunakan Link Base Terkunci
-              </button>
+              {url && (
+                <button
+                  type="button"
+                  onClick={() => setUrl('')}
+                  className="text-[11px] text-rose-600 hover:text-rose-800 font-bold"
+                >
+                  ✕ Kosongkan Link
+                </button>
+              )}
             </div>
             <div className="relative">
               <Link className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit"
+                placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Link ini dikunci secara permanen sebagai sumber data operasional tab <strong>BASE</strong> & <strong>BASE2</strong>.
+              Anda bebas memasukkan tautan Google Spreadsheet publik apapun yang memuat tab <strong>BASE</strong> & <strong>BASE2</strong>.
             </p>
           </div>
 

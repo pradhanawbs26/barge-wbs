@@ -156,7 +156,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
   };
 
   const handlePasteDemoUrl = () => {
-    const demoUrl = 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit';
+    const demoUrl = 'https://docs.google.com/spreadsheets/d/1eCRt5dRuyRqZB9fllDrqtxkEMwR8hn3-IYb1rJzHObc/edit';
     setInputUrl(demoUrl);
   };
 
@@ -204,24 +204,19 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-extrabold text-slate-900">
-                  Google Spreadsheet (Sumber Data Utama Terkunci Permanen)
+                  Google Spreadsheet Operasional
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                  🔒 Locked Base
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${sheetsConfig.spreadsheetUrl ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'}`}>
+                  {sheetsConfig.spreadsheetUrl ? '🟢 Connected' : '⚪ Disconnected'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Koneksi tab <strong>"BASE"</strong> (Volume Ton MT) & <strong>"BASE2"</strong> (Loading & Delay Log) terkunci permanen sebagai acuan operasional.
+                Koneksi tab <strong>"BASE"</strong> (Volume Ton MT) & <strong>"BASE2"</strong> (Loading & Delay Log). Anda bebas mengubah link kapan saja.
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="px-3 py-1 rounded-full font-bold flex items-center gap-1.5 border bg-emerald-50 text-emerald-800 border-emerald-200">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Base Spreadsheet Terkoneksi & Terkunci
-            </span>
-
             {onResetCache && (
               <button
                 onClick={onResetCache}
@@ -241,20 +236,22 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
             {/* Input URL */}
             <div className="lg:col-span-6">
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                <span>URL Google Spreadsheet (Terkunci Permanen):</span>
-                <button
-                  type="button"
-                  onClick={handlePasteDemoUrl}
-                  className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
-                >
-                  🔒 Reset ke Link Base Terkunci
-                </button>
+                <span>URL Google Spreadsheet:</span>
+                {inputUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setInputUrl('')}
+                    className="text-[11px] text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1"
+                  >
+                    ✕ Kosongkan Link
+                  </button>
+                )}
               </label>
               <div className="relative">
                 <FileSpreadsheet className="w-4 h-4 text-emerald-600 absolute left-3 top-2.5" />
                 <input
                   type="url"
-                  placeholder="https://docs.google.com/spreadsheets/d/1abc...xyz/edit#gid=0"
+                  placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit"
                   value={inputUrl}
                   onChange={(e) => setInputUrl(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800"

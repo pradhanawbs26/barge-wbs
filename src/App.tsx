@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Ship,
   TrendingUp,
@@ -10,9 +10,11 @@ import {
   Sparkles,
   ExternalLink,
   RefreshCw,
-  Plus
+  Plus,
+  Link,
+  FileSpreadsheet,
+  XCircle
 } from 'lucide-react';
-import { INITIAL_BASE_DATA, INITIAL_BASE2_DATA } from './data/mockData';
 import {
   preprocessBargeData,
   calculateDelayPareto,
@@ -38,9 +40,12 @@ import {
   mapCsvToBaseRecords,
   mapCsvToBase2Records
 } from './utils/gsheetsFetcher';
+import { uploadRecordsToSupabase } from './utils/supabaseClient';
 
 export default function App() {
-  const [baseRecords, setBaseRecords] = useState<BaseRecord[]>(INITIAL_BASE_DATA);
+  const [baseRecords, setBaseRecords] = useState<BaseRecord[]>([]);
+  const [base2Records, setBase2Records] = useState<Base2Record[]>([]);
+
   const MONTH_LIST_2026 = useMemo(() => [
     'Januari 2026',
     'Februari 2026',
@@ -56,37 +61,38 @@ export default function App() {
     'Desember 2026'
   ], []);
 
-  const [base2Records, setBase2Records] = useState<Base2Record[]>(INITIAL_BASE2_DATA);
   const [selectedMonth, setSelectedMonth] = useState<string>('Oktober 2026');
   const [activeTab, setActiveTab] = useState<'summary' | 'timeline' | 'delay' | 'data'>('summary');
-  // Aturan Baku Permanen: Satuan ribuan menggunakan titik (.), desimal menggunakan koma (,)
   const decimalSeparator: 'comma' = 'comma';
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showGSheetsModal, setShowGSheetsModal] = useState(false);
 
-  // Link Spreadsheet Resmi Terkunci Permanen sebagai Base Sumber Data Utama
-  const DEFAULT_LOCKED_SPREADSHEET_URL =
-    'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit';
+  // Quick connector form state
+  const [quickUrlInput, setQuickUrlInput] = useState('');
+  const [quickError, setQuickError] = useState<string | null>(null);
+  const [quickFeedback, setQuickFeedback] = useState<string | null>(null);
 
   const [sheetsConfig, setSheetsConfig] = useState<GSheetsConfig>(() => {
     try {
       const saved = localStorage.getItem('wbs_permanent_sheets_config');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return {
-          ...parsed,
-          lastSynced: new Date(parsed.lastSynced || Date.now())
-        };
+        if (parsed.spreadsheetUrl && !parsed.spreadsheetUrl.includes('1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms')) {
+          return {
+            ...parsed,
+            lastSynced: new Date(parsed.lastSynced || Date.now())
+          };
+        }
       }
     } catch (e) {
       // ignore
     }
     return {
-      spreadsheetUrl: DEFAULT_LOCKED_SPREADSHEET_URL,
+      spreadsheetUrl: '',
       sheetBaseName: 'BASE',
       sheetBase2Name: 'BASE2',
       cacheTtlSeconds: 600,
-      status: 'connected',
+      status: 'sample_data',
       lastSynced: new Date()
     };
   });
@@ -95,7 +101,11 @@ export default function App() {
     setSheetsConfig((prev) => {
       const next = { ...prev, ...updated };
       try {
-        localStorage.setItem('wbs_permanent_sheets_config', JSON.stringify(next));
+        if (next.spreadsheetUrl) {
+          localStorage.setItem('wbs_permanent_sheets_config', JSON.stringify(next));
+        } else {
+          localStorage.removeItem('wbs_permanent_sheets_config');
+        }
       } catch (e) {
         // ignore
       }
@@ -156,14 +166,13 @@ export default function App() {
 
   // Handler Refresh Cache (TTL 10m)
   const handleRefreshCache = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setSheetsConfig((prev) => ({
-        ...prev,
-        lastSynced: new Date()
-      }));
-    }, 600);
+    if (sheetsConfig.spreadsheetUrl) {
+      handleFetchAndApplySpreadsheet(
+        sheetsConfig.spreadsheetUrl,
+        sheetsConfig.sheetBaseName || 'BASE',
+        sheetsConfig.sheetBase2Name || 'BASE2'
+      );
+    }
   };
 
   // Handler tambah data record manual
@@ -179,13 +188,37 @@ export default function App() {
     base2TabName: string
   ): Promise<{ success: boolean; message: string; rowsBase?: number; rowsBase2?: number }> => {
     setIsRefreshing(true);
+    setQuickError(null);
+    setQuickFeedback(null);
+
     try {
+      if (!url || !url.trim()) {
+        setBaseRecords([]);
+        setBase2Records([]);
+        setSheetsConfig({
+          spreadsheetUrl: '',
+          sheetBaseName: baseTabName,
+          sheetBase2Name: base2TabName,
+          cacheTtlSeconds: 600,
+          status: 'sample_data',
+          lastSynced: new Date()
+        });
+        try {
+          localStorage.removeItem('wbs_permanent_sheets_config');
+        } catch (e) {}
+
+        return {
+          success: true,
+          message: 'Link spreadsheet dan data telah dikosongkan. Silakan cantumkan link baru.'
+        };
+      }
+
       const sheetId = extractSpreadsheetId(url);
       if (!sheetId) {
         throw new Error('Format URL Google Spreadsheet tidak valid. Harap periksa kembali tautan yang disalin.');
       }
 
-      // Tarik tab BASE dan BASE2
+      // Tarik tab BASE dan BASE2 secara langsung via CSV export/GViz
       const [csvBase, csvBase2] = await Promise.all([
         fetchGoogleWorksheetCsv(sheetId, baseTabName),
         fetchGoogleWorksheetCsv(sheetId, base2TabName)
@@ -197,39 +230,84 @@ export default function App() {
       const parsedBase = mapCsvToBaseRecords(rawBaseRows);
       const parsedBase2 = mapCsvToBase2Records(rawBase2Rows);
 
-      if (parsedBase.length === 0 || parsedBase2.length === 0) {
-        throw new Error(
-          `Data sheet berhasil ditarik, namun kolom tidak cocok. Ditemukan: ${parsedBase.length} baris di '${baseTabName}' dan ${parsedBase2.length} baris di '${base2TabName}'. Pastikan tab '${baseTabName}' memiliki data kapal & volume, serta tab '${base2TabName}' memiliki data Tug Boat (Kolom B), Tongkang (Kolom C), dan delay.`
-        );
+      if (parsedBase.length > 0 && parsedBase2.length > 0) {
+        setBaseRecords(parsedBase);
+        setBase2Records(parsedBase2);
+        setSheetsConfig({
+          spreadsheetUrl: url.trim(),
+          sheetBaseName: baseTabName,
+          sheetBase2Name: base2TabName,
+          cacheTtlSeconds: 600,
+          status: 'connected',
+          lastSynced: new Date()
+        });
+
+        // Trigger background sync to Supabase
+        uploadRecordsToSupabase(parsedBase, parsedBase2).then((res) => {
+          if (res.success) {
+            console.log('Supabase sync status:', res.message);
+          }
+        });
+
+        try {
+          localStorage.setItem('wbs_permanent_sheets_config', JSON.stringify({
+            spreadsheetUrl: url.trim(),
+            sheetBaseName: baseTabName,
+            sheetBase2Name: base2TabName,
+            cacheTtlSeconds: 600,
+            status: 'connected',
+            lastSynced: new Date()
+          }));
+        } catch (e) {}
+
+        return {
+          success: true,
+          message: 'Berhasil memuat data!',
+          rowsBase: parsedBase.length,
+          rowsBase2: parsedBase2.length
+        };
       }
 
-      // Update data aktual
-      setBaseRecords(parsedBase);
-      setBase2Records(parsedBase2);
-      setSheetsConfig({
-        spreadsheetUrl: url,
-        sheetBaseName: baseTabName,
-        sheetBase2Name: base2TabName,
-        cacheTtlSeconds: 600,
-        status: 'connected',
-        lastSynced: new Date()
-      });
-
-      return {
-        success: true,
-        message: `Berhasil memuat data aktual! ${parsedBase.length} baris tab '${baseTabName}' dan ${parsedBase2.length} baris tab '${base2TabName}' telah aktif di dashboard.`,
-        rowsBase: parsedBase.length,
-        rowsBase2: parsedBase2.length
-      };
+      throw new Error(`Data sheet berhasil ditarik, namun kolom tidak cocok. Pastikan tab '${baseTabName}' memuat volume dan '${base2TabName}' memuat delay & waktu.`);
     } catch (err: any) {
       console.error('Fetch error:', err);
+      const errMs = err.message || 'Gagal mengambil data dari Google Spreadsheet.';
+      setQuickError(errMs);
       return {
         success: false,
-        message: err.message || 'Gagal mengambil data dari Google Spreadsheet.'
+        message: errMs
       };
     } finally {
       setIsRefreshing(false);
     }
+  };
+
+  // Auto fetch on load if url exists in sheetsConfig
+  useEffect(() => {
+    if (sheetsConfig.spreadsheetUrl && baseRecords.length === 0) {
+      handleFetchAndApplySpreadsheet(
+        sheetsConfig.spreadsheetUrl,
+        sheetsConfig.sheetBaseName || 'BASE',
+        sheetsConfig.sheetBase2Name || 'BASE2'
+      );
+    }
+  }, []);
+
+  // Handler Kosongkan Link
+  const handleClearSpreadsheetLink = () => {
+    setQuickUrlInput('');
+    handleFetchAndApplySpreadsheet('', 'BASE', 'BASE2');
+  };
+
+  // Handler submit form koneksi cepat
+  const handleQuickSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickUrlInput.trim()) return;
+    handleFetchAndApplySpreadsheet(
+      quickUrlInput.trim(),
+      sheetsConfig.sheetBaseName || 'BASE',
+      sheetsConfig.sheetBase2Name || 'BASE2'
+    );
   };
 
   // Handler jika user mengimpor via paste CSV langsung
@@ -254,7 +332,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-800 flex flex-col font-sans">
-      {/* Top Header dengan Dropdown Pemilihan Bulan di Pojok Kanan Atas */}
+      {/* Top Header */}
       <Header
         selectedMonth={selectedMonth}
         onSelectMonth={setSelectedMonth}
@@ -268,7 +346,18 @@ export default function App() {
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 flex-1 space-y-6">
         {/* MAIN DASHBOARD CONTENT AREA (FULL WIDTH) */}
         <main className="w-full space-y-6 min-w-0">
-          {/* TAB NAVIGATION: 4 TAB MURNI OPERASIONAL */}
+          {/* Quick Error Message if fetch fails */}
+          {quickError && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>{quickError}</span>
+              </div>
+              <button onClick={() => setQuickError(null)} className="text-rose-500 hover:text-rose-700 text-xs font-bold">✕</button>
+            </div>
+          )}
+
+          {/* TAB NAVIGATION */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-1.5 flex items-center flex-wrap gap-1">
             <button
               onClick={() => setActiveTab('summary')}
@@ -315,14 +404,68 @@ export default function App() {
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              TAB 4: Tabel & Detail Data (Link Spreadsheet)
+              TAB 4: Tabel & Detail Data
             </button>
           </div>
+
+          {/* EMPTY STATE HERO BANNER WHEN NO DATA IS LOADED YET */}
+          {processedAllBarges.length === 0 && (
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-8 sm:p-12 text-center space-y-4 max-w-2xl mx-auto my-6">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto border border-emerald-100 shadow-xs">
+                <FileSpreadsheet className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-extrabold text-slate-900">
+                  Kolom Link Spreadsheet Masih Kosong
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1.5 max-w-md mx-auto leading-relaxed">
+                  Silakan cantumkan URL Google Spreadsheet operasional Anda secara bebas untuk memuat seluruh analisis & grafik. Tanpa data dummy.
+                </p>
+              </div>
+
+              <form onSubmit={handleQuickSubmit} className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 max-w-lg mx-auto">
+                  <input
+                    type="url"
+                    placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit"
+                    value={quickUrlInput}
+                    onChange={(e) => setQuickUrlInput(e.target.value)}
+                    className="w-full px-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-slate-800 font-medium"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isRefreshing || !quickUrlInput.trim()}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shrink-0 flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    {isRefreshing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Memuat...
+                      </>
+                    ) : (
+                      <>
+                        <Link className="w-4 h-4" />
+                        Tarik Data
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-center gap-4 text-[11px] text-slate-400 flex-wrap">
+                <span>✅ Bebas Memasukkan Link Spreadsheet Publik</span>
+                <span>•</span>
+                <span>✅ Bebas Data Dummy</span>
+                <span>•</span>
+                <span>✅ Auto Sync Tab BASE & BASE2</span>
+              </div>
+            </div>
+          )}
 
           {/* ==================================================================== */}
           {/* TAB 1: EXECUTIVE SUMMARY */}
           {/* ==================================================================== */}
-          {activeTab === 'summary' && (
+          {activeTab === 'summary' && processedAllBarges.length > 0 && (
             <div className="space-y-6">
               {/* Cupertino Metric Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -472,7 +615,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Data Rekonsiliasi Spreadsheet PT WBS (Daily, Weekly, Monthly, Yearly 2026) */}
+              {/* Data Rekonsiliasi Spreadsheet PT WBS */}
               <DepartmentKpiSection kpis={DEPARTMENT_OPERATION_KPIS} />
 
               {/* Summary Table of Barge Records */}
@@ -547,7 +690,7 @@ export default function App() {
           {/* ==================================================================== */}
           {/* TAB 2: TIMELINE AKTIVITAS (GANTT CHART) */}
           {/* ==================================================================== */}
-          {activeTab === 'timeline' && (
+          {activeTab === 'timeline' && processedAllBarges.length > 0 && (
             <div className="space-y-6">
               <GanttChart barges={filteredBarges} />
 
@@ -600,12 +743,12 @@ export default function App() {
           {/* ==================================================================== */}
           {/* TAB 3: ANALISIS DELAY (PARETO CHART) */}
           {/* ==================================================================== */}
-          {activeTab === 'delay' && (
+          {activeTab === 'delay' && processedAllBarges.length > 0 && (
             <DelayParetoChart metrics={delayMetrics} barges={filteredBarges} />
           )}
 
           {/* ==================================================================== */}
-          {/* TAB 4: DATA DETAIL & SHEET INSPECTOR (DENGAN INPUT LINK SPREADSHEET) */}
+          {/* TAB 4: DATA DETAIL & SHEET INSPECTOR */}
           {/* ==================================================================== */}
           {activeTab === 'data' && (
             <DataInspector
@@ -626,7 +769,7 @@ export default function App() {
 
       {/* Subtle Operational Footer */}
       <footer className="mt-auto py-4 border-t border-slate-200/60 bg-white/50 text-[11px] text-slate-400 text-center">
-        <span>PT WBS Operational Logistics • Jetty Performance & BLC Productivity Dashboard • Vercel Ready</span>
+        <span>PT WBS Operational Logistics • Jetty Performance & BLC Productivity Dashboard</span>
       </footer>
 
       {/* Google Sheets Modal */}

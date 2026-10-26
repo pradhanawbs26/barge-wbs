@@ -342,13 +342,56 @@ export function preprocessBargeData(
     }
 
     const loading = Number(item.Loading) || 0;
-    const breakdown = Number(item.Breakdown) || 0;
-    const heavyRain = Number(item['Heavy Rain']) || 0;
-    const waiting = Number(item.Waiting) || 0;
-    const totalDelay = breakdown + heavyRain + waiting;
+    let breakdown = Number(item.Breakdown) || 0;
+    let heavyRain = Number(item['Heavy Rain']) || 0;
+    let waiting = Number(item.Waiting) || 0;
+
+    // Hitung detail delay jika ada activityDetails (Kolom H..AA)
+    let detailedDelaySum = 0;
+    if (item.activityDetails && item.activityDetails.length > 0) {
+      let bdSum = 0;
+      let hrSum = 0;
+      let wtSum = 0;
+
+      item.activityDetails.forEach((act) => {
+        if (act.category === 'Loading' || act.activityName.toLowerCase().includes('loading to barge')) return;
+        const dur = act.durationHours || 0;
+        if (dur <= 0) return;
+
+        detailedDelaySum += dur;
+        const lowerName = act.activityName.toLowerCase();
+        const lowerCat = (act.category || '').toLowerCase();
+
+        if (lowerCat.includes('breakdown') || lowerName.includes('breakdown') || lowerName.includes('kerusakan')) {
+          bdSum += dur;
+        } else if (lowerCat.includes('heavy rain') || lowerName.includes('rain') || lowerName.includes('hujan')) {
+          hrSum += dur;
+        } else if (lowerCat.includes('waiting') || lowerName.includes('waiting') || lowerName.includes('tunggu') || lowerName.includes('standby')) {
+          wtSum += dur;
+        }
+      });
+
+      if (detailedDelaySum > 0) {
+        breakdown = parseFloat(bdSum.toFixed(2));
+        heavyRain = parseFloat(hrSum.toFixed(2));
+        waiting = parseFloat(wtSum.toFixed(2));
+      }
+    }
+
+    let totalDelay = detailedDelaySum > 0
+      ? parseFloat(detailedDelaySum.toFixed(2))
+      : parseFloat((breakdown + heavyRain + waiting).toFixed(2));
+
     const berthDuration = !isNaN(castInDate.getTime()) && !isNaN(castOffDate.getTime())
       ? (castOffDate.getTime() - castInDate.getTime()) / (1000 * 3600)
       : loading + totalDelay;
+
+    // Jika totalDelay masih 0 namun berthDuration melebihi durasi loading
+    if (totalDelay === 0 && berthDuration > loading + 0.1) {
+      const excess = parseFloat((berthDuration - loading).toFixed(2));
+      totalDelay = excess;
+      waiting = excess;
+    }
 
     // Performa BLC:
     // Waktu Target = Ton/Rit / 1350
@@ -417,70 +460,136 @@ export function preprocessBargeData(
 }
 
 /**
+ * Normalisasi nama kategori delay ke standar operasional PT WBS agar tidak terjadi duplikasi
+ * (contoh: 'Cast off (CAST Off)' dan 'Cast off' digabung menjadi 'Cast Off (Lepas Sandar)')
+ */
+export function normalizeDelayCategory(rawName: string, actCategory?: string): { canonicalName: string; color: string } {
+  if (!rawName) return { canonicalName: 'Lainnya', color: '#64748b' };
+
+  // Clean whitespace & non-breaking space
+  const clean = rawName.replace(/[\u00a0\r\n]/g, ' ').trim().replace(/\s+/g, ' ');
+  const lower = clean.toLowerCase();
+
+  if (
+    lower.includes('cast-in') ||
+    lower.includes('cast in') ||
+    lower.includes('sandar tongkang') ||
+    lower.includes('barge sandar')
+  ) {
+    return { canonicalName: 'Cast-In (Sandar)', color: '#2563eb' }; // Royal Blue
+  }
+  if (
+    lower.includes('cast off') ||
+    lower.includes('cast-off') ||
+    lower.includes('lepas sandar')
+  ) {
+    return { canonicalName: 'Cast Off (Lepas)', color: '#0284c7' }; // Sky Blue
+  }
+  if (
+    lower.includes('draft survey') ||
+    lower.includes('surveyor') ||
+    lower.includes('initial draft') ||
+    lower.includes('final draft')
+  ) {
+    return { canonicalName: 'Draft Survey (Initial/Final)', color: '#06b6d4' }; // Cyan
+  }
+  if (
+    lower.includes('rest time') ||
+    lower.includes('istirahat') ||
+    lower.includes('shift') ||
+    lower.includes('over shift')
+  ) {
+    return { canonicalName: 'Rest Time & Over Shift', color: '#8b5cf6' }; // Purple
+  }
+  if (
+    lower.includes('breakdown') ||
+    lower.includes('kerusakan') ||
+    actCategory === 'Breakdown'
+  ) {
+    return { canonicalName: 'Breakdown BLC', color: '#ef4444' }; // Red
+  }
+  if (
+    lower.includes('rain') ||
+    lower.includes('hujan') ||
+    actCategory === 'Heavy Rain'
+  ) {
+    return { canonicalName: 'Heavy Rain / Cuaca', color: '#3b82f6' }; // Blue
+  }
+  if (
+    lower.includes('p5m') ||
+    lower.includes('p2h') ||
+    lower.includes('safety talk') ||
+    lower.includes('safety')
+  ) {
+    return { canonicalName: 'P5M, P2H & Safety Talk', color: '#10b981' }; // Emerald
+  }
+  if (
+    lower.includes('prepare') ||
+    lower.includes('persiapan')
+  ) {
+    return { canonicalName: 'Prepare Loading', color: '#059669' }; // Emerald Dark
+  }
+  if (
+    lower.includes('waiting') ||
+    lower.includes('tunggu') ||
+    lower.includes('standby') ||
+    actCategory === 'Waiting'
+  ) {
+    return { canonicalName: 'Waiting / Standby Tugboat', color: '#f59e0b' }; // Amber
+  }
+  if (
+    lower.includes('external') ||
+    lower.includes('problem') ||
+    lower.includes('external problem')
+  ) {
+    return { canonicalName: 'External Problem', color: '#d97706' }; // Warm Amber
+  }
+
+  return { canonicalName: clean, color: '#64748b' };
+}
+
+/**
  * Menghitung metrik Pareto Delay dinamis berdasarkan seluruh aktivitas & delay Kolom H..AA
  */
 export function calculateDelayPareto(barges: ProcessedBarge[]): DelayMetric[] {
-  // Kumpulkan seluruh log aktivitas non-loading
+  // Kumpulkan seluruh log aktivitas non-loading dengan kategori terstandardisasi
   const categoryMap = new Map<string, { totalJam: number; color: string }>();
-
-  // Warna kategori standar operasional
-  const defaultColorMap: Record<string, string> = {
-    'Breakdown': '#ef4444',
-    'Waiting Cargo': '#f59e0b',
-    'Change Shift': '#8b5cf6',
-    'Rest Time': '#6366f1',
-    'Heavy Rain': '#3b82f6',
-    'Surveyor Draft Survey': '#06b6d4',
-    'Prepare Loading': '#10b981',
-    'Moving Cargo': '#14b8a6',
-    'Standby': '#94a3b8'
-  };
 
   barges.forEach((b) => {
     if (b.activityDetails && b.activityDetails.length > 0) {
       b.activityDetails.forEach((act) => {
         // Hanya hitung delay / non-loading items
-        if (act.category === 'Loading') return;
+        if (act.category === 'Loading' || act.activityName.toLowerCase().includes('loading to barge')) return;
 
-        const name = act.activityName.trim();
         const duration = act.durationHours;
         if (duration <= 0) return;
 
-        if (!categoryMap.has(name)) {
-          const color =
-            defaultColorMap[name] ||
-            (act.category === 'Breakdown'
-              ? '#ef4444'
-              : act.category === 'Heavy Rain'
-              ? '#3b82f6'
-              : act.category === 'Waiting'
-              ? '#f59e0b'
-              : act.category === 'Shift / Rest'
-              ? '#8b5cf6'
-              : act.category === 'Surveyor'
-              ? '#06b6d4'
-              : '#64748b');
+        const { canonicalName, color } = normalizeDelayCategory(act.activityName, act.category);
 
-          categoryMap.set(name, { totalJam: 0, color });
+        if (!categoryMap.has(canonicalName)) {
+          categoryMap.set(canonicalName, { totalJam: 0, color });
         }
-        categoryMap.get(name)!.totalJam += duration;
+        categoryMap.get(canonicalName)!.totalJam += duration;
       });
     } else {
       // Fallback jika tidak ada granular activity details
       if (b.Breakdown > 0) {
-        const entry = categoryMap.get('Breakdown') || { totalJam: 0, color: '#ef4444' };
+        const key = 'Breakdown BLC';
+        const entry = categoryMap.get(key) || { totalJam: 0, color: '#ef4444' };
         entry.totalJam += b.Breakdown;
-        categoryMap.set('Breakdown', entry);
+        categoryMap.set(key, entry);
       }
       if (b.HeavyRain > 0) {
-        const entry = categoryMap.get('Heavy Rain') || { totalJam: 0, color: '#3b82f6' };
+        const key = 'Heavy Rain / Cuaca';
+        const entry = categoryMap.get(key) || { totalJam: 0, color: '#3b82f6' };
         entry.totalJam += b.HeavyRain;
-        categoryMap.set('Heavy Rain', entry);
+        categoryMap.set(key, entry);
       }
       if (b.Waiting > 0) {
-        const entry = categoryMap.get('Waiting Cargo') || { totalJam: 0, color: '#f59e0b' };
+        const key = 'Waiting / Standby Tugboat';
+        const entry = categoryMap.get(key) || { totalJam: 0, color: '#f59e0b' };
         entry.totalJam += b.Waiting;
-        categoryMap.set('Waiting Cargo', entry);
+        categoryMap.set(key, entry);
       }
     }
   });
@@ -488,13 +597,14 @@ export function calculateDelayPareto(barges: ProcessedBarge[]): DelayMetric[] {
   // Jika belum ada data delay sama sekali
   if (categoryMap.size === 0) {
     return [
+      { kategori: 'Cast Off (Lepas)', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#0284c7' },
       { kategori: 'Breakdown BLC', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#ef4444' },
-      { kategori: 'Heavy Rain', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#3b82f6' },
-      { kategori: 'Waiting Cargo', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#f59e0b' }
+      { kategori: 'Heavy Rain / Cuaca', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#3b82f6' },
+      { kategori: 'Waiting / Standby Tugboat', totalJam: 0, kumulatifJam: 0, kumulatifPersen: 0, color: '#f59e0b' }
     ];
   }
 
-  // Ubah ke array dan sort descending untuk Pareto
+  // Ubah ke array dan sort descending untuk Pareto (kategori terbesar lebih awal)
   const categories: { kategori: string; totalJam: number; color: string }[] = [];
   categoryMap.forEach((val, key) => {
     categories.push({
@@ -521,3 +631,4 @@ export function calculateDelayPareto(barges: ProcessedBarge[]): DelayMetric[] {
     };
   });
 }
+
