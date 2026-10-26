@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BaseRecord, Base2Record, ProcessedBarge, GSheetsConfig } from '../types';
+import { formatDisplayDate, formatDecimalNumber, formatHours } from '../utils/bargeAnalytics';
 import {
   Search,
   Download,
@@ -30,6 +31,7 @@ interface DataInspectorProps {
   onManualImportCsv?: (csvBase: string, csvBase2: string) => boolean;
   onResetCache?: () => void;
   onAddRecord?: (base: BaseRecord, base2: Base2Record) => void;
+  decimalSeparator?: 'comma' | 'dot';
 }
 
 export const DataInspector: React.FC<DataInspectorProps> = ({
@@ -41,7 +43,8 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
   onFetchSpreadsheet,
   onManualImportCsv,
   onResetCache,
-  onAddRecord
+  onAddRecord,
+  decimalSeparator = 'comma'
 }) => {
   const [activeTab, setActiveTab] = useState<'merged' | 'base' | 'base2'>('merged');
   const [searchTerm, setSearchTerm] = useState('');
@@ -188,7 +191,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
   return (
     <div className="space-y-6">
       {/* ===================================================================== */}
-      {/* MENU PEMASANGAN LINK SPREADSHEET (SESUAI REQUEST USER) */}
+      {/* MENU PEMASANGAN LINK SPREADSHEET (SUMBER DATA TERKUNCI PERMANEN) */}
       {/* ===================================================================== */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/40 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
@@ -199,29 +202,24 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
               <Link className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                Pemasangan Link Google Spreadsheet (Sumber Data)
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Google Spreadsheet (Sumber Data Utama Terkunci Permanen)
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                  🔒 Locked Base
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Hubungkan langsung tab <strong>"BASE"</strong> (Volume MT) dan <strong>"BASE2"</strong> (Loading & Delay) via <code>st.connection</code>.
+                Koneksi tab <strong>"BASE"</strong> (Volume Ton MT) & <strong>"BASE2"</strong> (Loading & Delay Log) terkunci permanen sebagai acuan operasional.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span
-              className={`px-3 py-1 rounded-full font-bold flex items-center gap-1.5 border ${
-                sheetsConfig.spreadsheetUrl
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  : 'bg-slate-100 text-slate-700 border-slate-200'
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  sheetsConfig.spreadsheetUrl ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
-                }`}
-              ></span>
-              {sheetsConfig.spreadsheetUrl ? 'Google Sheets Aktif' : 'Data Operasional PT WBS (Aktif)'}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="px-3 py-1 rounded-full font-bold flex items-center gap-1.5 border bg-emerald-50 text-emerald-800 border-emerald-200">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Base Spreadsheet Terkoneksi & Terkunci
             </span>
 
             {onResetCache && (
@@ -231,7 +229,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
                 title="Reset cache data (TTL 10 menit)"
               >
                 <RefreshCw className="w-3 h-3" />
-                Reset Cache (10m)
+                Refresh Cache (10m)
               </button>
             )}
           </div>
@@ -243,13 +241,13 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
             {/* Input URL */}
             <div className="lg:col-span-6">
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                <span>URL Google Spreadsheet:</span>
+                <span>URL Google Spreadsheet (Terkunci Permanen):</span>
                 <button
                   type="button"
                   onClick={handlePasteDemoUrl}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-semibold"
+                  className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
                 >
-                  Tempel Contoh Format
+                  🔒 Reset ke Link Base Terkunci
                 </button>
               </label>
               <div className="relative">
@@ -392,11 +390,11 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
               </div>
               <div className="bg-white p-1.5 rounded-lg border border-slate-200">
                 <span className="text-slate-400 font-sans block text-[9px] uppercase font-bold">BASE2: Col D, E, F, G</span>
-                <span className="text-slate-800 font-bold">DD, Date Aktual, Start & End Time</span>
+                <span className="text-slate-800 font-bold">DD (Pemuatan), Date, Start & End Time</span>
               </div>
               <div className="bg-white p-1.5 rounded-lg border border-slate-200">
-                <span className="text-slate-400 font-sans block text-[9px] uppercase font-bold">BASE2: Col H s/d AA</span>
-                <span className="text-indigo-700 font-bold">Nama Aktivitas & Delay</span>
+                <span className="text-slate-400 font-sans block text-[9px] uppercase font-bold">Acu Urutan September &gt; Oktober</span>
+                <span className="text-indigo-700 font-bold">Voyage 987 (30-Sep) → 988 (1-Okt)</span>
               </div>
             </div>
           </div>
@@ -517,15 +515,29 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
                       {row.TB || 'TB. ASSIST 01'}
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-900">{row.BG}</td>
-                    <td className="py-2.5 px-2 text-slate-500 font-mono">{row.DD}</td>
-                    <td className="py-2.5 px-2 text-right font-semibold">{row.TonRit.toLocaleString('id-ID')} MT</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-semibold text-emerald-700">{row.Loading.toFixed(1)} h</td>
-                    <td className="py-2.5 px-2 text-right text-slate-500">{row.WaktuTarget.toFixed(2)} h</td>
-                    <td className="py-2.5 px-2 text-right font-bold text-slate-900 font-mono">
-                      {row.AktualProduktivitas.toFixed(1)} T/h
+                    <td className="py-2.5 px-2 text-slate-700 font-mono font-bold">
+                      {formatDisplayDate(row.DD || row.CastInDate || row.CastIn)}
                     </td>
-                    <td className="py-2.5 px-2 text-right text-indigo-600 font-semibold font-mono">{row.IdleTime.toFixed(1)} h</td>
-                    <td className="py-2.5 px-2 text-right text-slate-500 font-mono">{row.TotalDelay.toFixed(1)} h</td>
+                    <td className="py-2.5 px-2 text-right font-semibold">
+                      {decimalSeparator === 'comma'
+                        ? `${row.TonRit.toLocaleString('id-ID')} MT`
+                        : `${row.TonRit.toLocaleString('en-US')} MT`}
+                    </td>
+                    <td className="py-2.5 px-2 text-right font-mono font-semibold text-emerald-700">
+                      {formatHours(row.Loading, 1, decimalSeparator)}
+                    </td>
+                    <td className="py-2.5 px-2 text-right text-slate-500 font-mono">
+                      {formatHours(row.WaktuTarget, 2, decimalSeparator)}
+                    </td>
+                    <td className="py-2.5 px-2 text-right font-bold text-slate-900 font-mono">
+                      {formatDecimalNumber(row.AktualProduktivitas, 1, decimalSeparator)} T/h
+                    </td>
+                    <td className="py-2.5 px-2 text-right text-indigo-600 font-semibold font-mono">
+                      {formatHours(row.IdleTime, 1, decimalSeparator)}
+                    </td>
+                    <td className="py-2.5 px-2 text-right text-slate-500 font-mono">
+                      {formatHours(row.TotalDelay, 1, decimalSeparator)}
+                    </td>
                     <td className="py-2.5 px-2 text-center">
                       <button
                         type="button"
@@ -572,7 +584,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
                       </span>
                     </td>
                     <td className="py-2.5 px-3 font-bold text-slate-900">{row.BG || '-'}</td>
-                    <td className="py-2.5 px-3 text-slate-500 font-mono">{row.DD || '-'}</td>
+                    <td className="py-2.5 px-3 text-slate-700 font-mono font-bold">{formatDisplayDate(row.DD)}</td>
                     <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
                       {row['Ton/Rit'].toLocaleString('id-ID')} MT
                     </td>
@@ -605,13 +617,21 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
                     <td className="py-2.5 px-2 font-mono font-bold text-slate-600">{row.voyageNo || `10${22 + idx}`}</td>
                     <td className="py-2.5 px-3 font-medium text-slate-700">{row.TB || 'TB. LEO POWER'}</td>
                     <td className="py-2.5 px-3 font-bold text-slate-900">{row.BG}</td>
-                    <td className="py-2.5 px-2 text-slate-500 font-mono">{row.DD}</td>
+                    <td className="py-2.5 px-2 text-slate-700 font-mono font-bold">{formatDisplayDate(row.DD || row['Cast-in'])}</td>
                     <td className="py-2.5 px-2 text-slate-500 font-mono text-[11px]">{row['Cast-in']}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">{row.Loading} h</td>
+                    <td className="py-2.5 px-2 text-right font-mono font-bold text-emerald-700">
+                      {formatHours(row.Loading, 1, decimalSeparator)}
+                    </td>
                     <td className="py-2.5 px-2 text-slate-500 font-mono text-[11px]">{row['Cast off']}</td>
-                    <td className="py-2.5 px-2 text-right text-rose-600 font-mono">{row.Breakdown} h</td>
-                    <td className="py-2.5 px-2 text-right text-amber-600 font-mono">{row.Waiting} h</td>
-                    <td className="py-2.5 px-2 text-right text-purple-600 font-mono">{row.shiftRest || 0.25} h</td>
+                    <td className="py-2.5 px-2 text-right text-rose-600 font-mono">
+                      {formatHours(row.Breakdown, 1, decimalSeparator)}
+                    </td>
+                    <td className="py-2.5 px-2 text-right text-amber-600 font-mono">
+                      {formatHours(row.Waiting, 1, decimalSeparator)}
+                    </td>
+                    <td className="py-2.5 px-2 text-right text-purple-600 font-mono">
+                      {formatHours(row.shiftRest || 0.25, 1, decimalSeparator)}
+                    </td>
                     <td className="py-2.5 px-2 text-center">
                       <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-semibold border border-emerald-200">
                         {row.activityDetails?.length || 1} baris interval
@@ -864,7 +884,7 @@ export const DataInspector: React.FC<DataInspectorProps> = ({
                   <p className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span>Tug Boat (Col B): <strong>{inspectingBarge.TB || 'TB. ASSIST'}</strong></span>
                     <span>Tongkang (Col C): <strong className="text-slate-900">{inspectingBarge.BG}</strong></span>
-                    <span>Tanggal Pemuatan (Col D): <strong>{inspectingBarge.DD}</strong></span>
+                    <span>Tanggal Pemuatan (Col D): <strong className="text-slate-900 font-mono">{formatDisplayDate(inspectingBarge.DD)}</strong></span>
                     <span>Sandar: <strong>{inspectingBarge.CastIn}</strong> s/d <strong>{inspectingBarge.CastOff}</strong></span>
                   </p>
                 </div>

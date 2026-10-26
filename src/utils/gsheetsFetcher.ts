@@ -148,13 +148,27 @@ export function parseCsvText(csvText: string): Record<string, string>[] {
 }
 
 /**
- * Normalisasi format tanggal Indonesia (seperti "17-Okt-26", "18-Okt-26", "17/10/2026", "2026-10-17")
+ * Normalisasi format tanggal Indonesia & Google Sheets GViz:
+ * - "17-Okt-26", "1-Okt-2026", "30-Sep-26"
+ * - "Date(2026,9,1)" atau "Date(2026,8,30)" (GViz 0-indexed month)
+ * - "01/10/2026", "2026-10-01"
+ * - Excel serial number (e.g. 46300)
  */
 export function normalizeDateString(rawDate: string): string {
   if (!rawDate) return '';
   const clean = rawDate.trim();
+  if (!clean || clean === '-' || clean === '0') return '';
 
-  // 1. Format Indonesia dengan nama bulan: e.g. "17-Okt-26" atau "17-Okt-2026"
+  // 1. Google Sheets GViz Date constructor: Date(YYYY,M,D) dimana M adalah 0-indexed (9 = Oktober, 8 = September)
+  const gvizMatch = clean.match(/Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})/i);
+  if (gvizMatch) {
+    const y = gvizMatch[1];
+    const m = String(parseInt(gvizMatch[2], 10) + 1).padStart(2, '0');
+    const d = gvizMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 2. Format Indonesia dengan nama bulan: e.g. "17-Okt-26", "1-Okt-2026", "30-Sep-26"
   const indMonthMatch = clean.match(/^(\d{1,2})[\s\-\/]([a-zA-Z]{3,})[\s\-\/](\d{2,4})/);
   if (indMonthMatch) {
     const day = indMonthMatch[1].padStart(2, '0');
@@ -175,7 +189,7 @@ export function normalizeDateString(rawDate: string): string {
     return `${year}-${monthNum}-${day}`;
   }
 
-  // 2. Format DD/MM/YYYY atau DD-MM-YYYY
+  // 3. Format DD/MM/YYYY atau DD-MM-YYYY (atau dengan waktu)
   const dmyMatch = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
   if (dmyMatch) {
     const day = dmyMatch[1].padStart(2, '0');
@@ -185,7 +199,7 @@ export function normalizeDateString(rawDate: string): string {
     return `${year}-${month}-${day}`;
   }
 
-  // 3. Format YYYY-MM-DD
+  // 4. Format YYYY-MM-DD
   const ymdMatch = clean.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   if (ymdMatch) {
     const month = ymdMatch[2].padStart(2, '0');
@@ -193,7 +207,19 @@ export function normalizeDateString(rawDate: string): string {
     return `${ymdMatch[1]}-${month}-${day}`;
   }
 
-  // 4. Jika format datetime ISO
+  // 5. Excel Serial Number (e.g. 46296 -> 1 Oktober 2026)
+  if (/^\d{5}$/.test(clean)) {
+    const serial = parseInt(clean, 10);
+    const utcDays = serial - 25569;
+    const utcValue = utcDays * 86400;
+    const dateInfo = new Date(utcValue * 1000);
+    const y = dateInfo.getFullYear();
+    const m = String(dateInfo.getMonth() + 1).padStart(2, '0');
+    const d = String(dateInfo.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 6. Jika format datetime ISO
   const parsed = new Date(clean);
   if (!isNaN(parsed.getTime())) {
     const y = parsed.getFullYear();
@@ -432,7 +458,19 @@ export function mapCsvToBase2Records(rows: Record<string, string>[]): Base2Recor
       return;
     }
 
-    const rawLoadingDate = r['_COL_3'] || r['DD'] || '';
+    let rawLoadingDate = (r['_COL_3'] || '').trim();
+    if (!rawLoadingDate) {
+      // Periksa semua keys jika ada nama kolom 'DD' (dengan/tanpa spasi, case-insensitive)
+      const ddKey = Object.keys(r).find((k) =>
+        !k.startsWith('_') && /^(dd|tgl\s*loading|tanggal\s*loading|tgl\s*muat|tgl|tanggal)$/i.test(k.trim())
+      );
+      if (ddKey && r[ddKey]) rawLoadingDate = r[ddKey].trim();
+    }
+    if (!rawLoadingDate && r['_COL_4']) {
+      // Cek jika _COL_4 memiliki format tanggal valid
+      const testCol4 = normalizeDateString(r['_COL_4']);
+      if (testCol4) rawLoadingDate = r['_COL_4'].trim();
+    }
     const loadingDate = normalizeDateString(rawLoadingDate);
 
     const rawActivityDate = r['_COL_4'] || r['Date (DD/M/Y)'] || r['Date'] || rawLoadingDate;
@@ -531,6 +569,32 @@ export function mapCsvToBase2Records(rows: Record<string, string>[]): Base2Recor
     }
   });
 
+  // Back-fill & Forward-fill loadingDate dan TB untuk voyage yang sama:
+  // Di sheet aktual, baris pertama (Cast-in/Barge Sandar) seringkali belum diisi tanggalnya di Kolom D,
+  // melainkan baru terisi di baris kedua/ketiga saat survey & loading!
+  const voyageDateMap = new Map<string, string>();
+  const voyageTbMap = new Map<string, string>();
+
+  rawIntervals.forEach((item) => {
+    if (item.voyageNo && item.loadingDate && !voyageDateMap.has(item.voyageNo)) {
+      voyageDateMap.set(item.voyageNo, item.loadingDate);
+    }
+    if (item.voyageNo && item.tb && !voyageTbMap.has(item.voyageNo)) {
+      voyageTbMap.set(item.voyageNo, item.tb);
+    }
+  });
+
+  rawIntervals.forEach((item) => {
+    if (item.voyageNo) {
+      if (!item.loadingDate && voyageDateMap.has(item.voyageNo)) {
+        item.loadingDate = voyageDateMap.get(item.voyageNo)!;
+      }
+      if (!item.tb && voyageTbMap.has(item.voyageNo)) {
+        item.tb = voyageTbMap.get(item.voyageNo)!;
+      }
+    }
+  });
+
   // 3. AGREGASI PER TONGKANG / SIKLUS VOYAGE:
   // Kelompokkan semua baris yang memiliki VoyageNo sama ATAU [BG + LoadingDate] sama
   const groupedVoyages = new Map<string, RawIntervalRow[]>();
@@ -552,9 +616,14 @@ export function mapCsvToBase2Records(rows: Record<string, string>[]): Base2Recor
     const lastInterval = intervals[intervals.length - 1];
 
     const voyageNo = firstInterval.voyageNo;
-    const tb = intervals.find((i) => i.tb)?.tb || firstInterval.tb;
+    const tb = intervals.find((i) => i.tb && i.tb.trim())?.tb || firstInterval.tb;
     const bg = firstInterval.bg;
-    const loadingDate = firstInterval.loadingDate;
+
+    // Ambil tanggal pemuatan non-kosong dari seluruh interval dalam voyage ini!
+    const loadingDate =
+      intervals.find((i) => i.loadingDate && i.loadingDate.trim())?.loadingDate ||
+      intervals.find((i) => i.activityDate && i.activityDate.trim())?.activityDate ||
+      '';
 
     // Hitung total durasi per kategori
     let loadingTotal = 0;

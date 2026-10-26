@@ -73,9 +73,9 @@ export const GSheetsSettingsModal: React.FC<GSheetsSettingsModalProps> = ({
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-semibold text-slate-700">Status Koneksi:</span>
-              <span className="text-slate-900 font-bold">
-                {config.spreadsheetUrl ? 'Terkoneksi ke Google Sheets' : 'Menggunakan Data Simulasi (Sample)'}
+              <span className="font-semibold text-slate-700">Status Sumber:</span>
+              <span className="text-slate-900 font-bold flex items-center gap-1">
+                🔒 Terkunci Permanen (Base Data)
               </span>
             </div>
             <button
@@ -88,9 +88,18 @@ export const GSheetsSettingsModal: React.FC<GSheetsSettingsModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
-              URL Google Spreadsheet
-            </label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="text-slate-700 font-semibold">
+                URL Google Spreadsheet (Base Sumber Data)
+              </label>
+              <button
+                type="button"
+                onClick={() => setUrl('https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit')}
+                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold"
+              >
+                🔒 Gunakan Link Base Terkunci
+              </button>
+            </div>
             <div className="relative">
               <Link className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
@@ -102,7 +111,7 @@ export const GSheetsSettingsModal: React.FC<GSheetsSettingsModalProps> = ({
               />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">
-              Pastikan akses sharing diset ke <strong>"Anyone with the link can view"</strong> atau menggunakan Service Account.
+              Link ini dikunci secara permanen sebagai sumber data operasional tab <strong>BASE</strong> & <strong>BASE2</strong>.
             </p>
           </div>
 

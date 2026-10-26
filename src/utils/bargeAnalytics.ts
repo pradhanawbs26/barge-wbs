@@ -1,5 +1,217 @@
 import { BaseRecord, Base2Record, ProcessedBarge, DelayMetric } from '../types';
 
+/**
+ * Parsing tanggal secara aman dan tahan terhadap berbagai format (ISO, Indonesian, YYYY-MM-DD, dll.)
+ */
+export function safeParseDate(val: string | Date | undefined | null, defaultYear = 2026): Date {
+  if (!val) return new Date(defaultYear, 9, 1, 8, 0, 0);
+  if (val instanceof Date) return isNaN(val.getTime()) ? new Date(defaultYear, 9, 1, 8, 0, 0) : val;
+
+  const s = String(val).trim();
+  if (!s) return new Date(defaultYear, 9, 1, 8, 0, 0);
+
+  // 1. Google Sheets GViz Date: "Date(YYYY,M,D)" (M adalah 0-indexed)
+  const matchGviz = s.match(/Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})(?:,\s*(\d{1,2}),\s*(\d{1,2})(?:,\s*(\d{1,2}))?)?/i);
+  if (matchGviz) {
+    const year = parseInt(matchGviz[1], 10);
+    const month = parseInt(matchGviz[2], 10);
+    const day = parseInt(matchGviz[3], 10);
+    const hh = matchGviz[4] ? parseInt(matchGviz[4], 10) : 8;
+    const mm = matchGviz[5] ? parseInt(matchGviz[5], 10) : 0;
+    const ss = matchGviz[6] ? parseInt(matchGviz[6], 10) : 0;
+    return new Date(year, month, day, hh, mm, ss);
+  }
+
+  // 2. Format Indonesia: "1-Okt-26 08:15:00" atau "30-Sep-26"
+  const matchInd = s.match(/^(\d{1,2})[\s\-\/]([a-zA-Z]{3,})[\s\-\/](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (matchInd) {
+    const day = parseInt(matchInd[1], 10);
+    const monthStr = matchInd[2].toLowerCase();
+    let year = parseInt(matchInd[3], 10);
+    if (year < 100) year += 2000;
+
+    const monthMap: Record<string, number> = {
+      jan: 0, feb: 1, mar: 2, apr: 3, mei: 4, may: 4,
+      jun: 5, jul: 6, agu: 7, ags: 7, aug: 7,
+      sep: 8, okt: 9, oct: 9, nov: 10, des: 11, dec: 11
+    };
+    const month = monthMap[monthStr.substring(0, 3)] ?? 9;
+    const hh = matchInd[4] ? parseInt(matchInd[4], 10) : 8;
+    const mm = matchInd[5] ? parseInt(matchInd[5], 10) : 0;
+    const ss = matchInd[6] ? parseInt(matchInd[6], 10) : 0;
+    return new Date(year, month, day, hh, mm, ss);
+  }
+
+  // 3. Format YYYY-MM-DD HH:mm:ss atau YYYY-MM-DD
+  const matchYmd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (matchYmd) {
+    const year = parseInt(matchYmd[1], 10);
+    const month = parseInt(matchYmd[2], 10) - 1;
+    const day = parseInt(matchYmd[3], 10);
+    const hh = matchYmd[4] ? parseInt(matchYmd[4], 10) : 8;
+    const mm = matchYmd[5] ? parseInt(matchYmd[5], 10) : 0;
+    const ss = matchYmd[6] ? parseInt(matchYmd[6], 10) : 0;
+    return new Date(year, month, day, hh, mm, ss);
+  }
+
+  // 4. Format DD/MM/YYYY
+  const matchDmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (matchDmy) {
+    let year = parseInt(matchDmy[3], 10);
+    if (year < 100) year += 2000;
+    const month = parseInt(matchDmy[2], 10) - 1;
+    const day = parseInt(matchDmy[1], 10);
+    const hh = matchDmy[4] ? parseInt(matchDmy[4], 10) : 8;
+    const mm = matchDmy[5] ? parseInt(matchDmy[5], 10) : 0;
+    const ss = matchDmy[6] ? parseInt(matchDmy[6], 10) : 0;
+    return new Date(year, month, day, hh, mm, ss);
+  }
+
+  // 5. Fallback standar JS Date
+  const isoCandidate = s.includes(' ') && !s.includes('T') ? s.replace(' ', 'T') : s;
+  const d = new Date(isoCandidate);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  return new Date(defaultYear, 9, 1, 8, 0, 0);
+}
+
+/**
+ * Format tampilan tanggal operasional Indonesia: e.g. "1-Okt-26" atau "30-Sep-26"
+ */
+export function formatDisplayDate(dateStr: string | Date | undefined): string {
+  if (!dateStr) return '-';
+  const clean = String(dateStr).trim();
+  if (!clean || clean === '-' || clean === '0') return '-';
+
+  if (/^\d{1,2}-[a-zA-Z]{3}-\d{2,4}$/.test(clean)) {
+    return clean;
+  }
+  const d = safeParseDate(dateStr);
+  if (isNaN(d.getTime())) return '-';
+  const day = d.getDate();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const m = months[d.getMonth()];
+  const y = String(d.getFullYear()).slice(-2);
+  return `${day}-${m}-${y}`;
+}
+
+/**
+ * Format angka desimal agar seragam dan bebas bias:
+ * - 'comma' (Standar Baku Indonesia): Desimal koma (,), ribuan titik (.) -> Contoh: 0,4 | 8,5 | 1.129,7 | 9.602,31
+ * - 'dot' (Standar Sistem/Internasional): Desimal titik (.), ribuan koma (,) -> Contoh: 0.4 | 8.5 | 1,129.7 | 9,602.31
+ */
+export function formatDecimalNumber(
+  val: number | undefined | null,
+  decimals: number = 1,
+  separator: 'comma' | 'dot' = 'comma'
+): string {
+  if (val === undefined || val === null || isNaN(val)) return '0';
+  const num = Number(val);
+  if (separator === 'comma') {
+    return num.toLocaleString('id-ID', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  } else {
+    return num.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
+  }
+}
+
+/**
+ * Format jam operasional (misal "0,4 h" atau "8,5 h" vs "0.4 h")
+ */
+export function formatHours(
+  hours: number | undefined | null,
+  decimals: number = 1,
+  separator: 'comma' | 'dot' = 'comma'
+): string {
+  if (hours === undefined || hours === null || isNaN(hours)) {
+    return separator === 'comma' ? '0,0 h' : '0.0 h';
+  }
+  return `${formatDecimalNumber(hours, decimals, separator)} h`;
+}
+
+/**
+ * Ekstraksi Month_Year acuan dari Kolom D (DD Pemuatan)
+ */
+export function getMonthYearFromDateString(dateStr: string | undefined): string {
+  if (!dateStr || !dateStr.trim()) return '';
+  const clean = String(dateStr).trim();
+  if (clean === '-' || clean === '0') return '';
+
+  // GViz Date format: Date(2026, 9, 1) -> 9 is October (0-indexed)
+  const gvizMatch = clean.match(/Date\((\d{4}),\s*(\d{1,2})/i);
+  if (gvizMatch) {
+    const year = gvizMatch[1];
+    const monthNum = parseInt(gvizMatch[2], 10); // 0-indexed in GViz
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return `${months[monthNum] || 'Oktober'} ${year}`;
+  }
+
+  // 1. Format Indonesia "1-Okt-26" atau "30-Sep-26"
+  const indMatch = clean.match(/^(\d{1,2})[\s\-\/]([a-zA-Z]{3,})[\s\-\/](\d{2,4})/);
+  if (indMatch) {
+    const monthStr = indMatch[2].toLowerCase();
+    const monthNames: Record<string, string> = {
+      jan: 'Januari', feb: 'Februari', mar: 'Maret', apr: 'April',
+      mei: 'Mei', may: 'Mei', jun: 'Juni', jul: 'Juli',
+      agu: 'Agustus', ags: 'Agustus', aug: 'Agustus',
+      sep: 'September', okt: 'Oktober', oct: 'Oktober',
+      nov: 'November', des: 'Desember', dec: 'Desember'
+    };
+    let year = indMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    const mName = monthNames[monthStr.substring(0, 3)] || 'Oktober';
+    return `${mName} ${year}`;
+  }
+
+  // 2. Format YYYY-MM-DD
+  const ymdMatch = clean.match(/^(\d{4})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const year = ymdMatch[1];
+    const monthNum = parseInt(ymdMatch[2], 10);
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const mName = months[monthNum - 1] || 'Oktober';
+    return `${mName} ${year}`;
+  }
+
+  // 3. Format DD/MM/YYYY
+  const dmyMatch = clean.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if (dmyMatch) {
+    let year = dmyMatch[3];
+    if (year.length === 2) year = `20${year}`;
+    const monthNum = parseInt(dmyMatch[2], 10);
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const mName = months[monthNum - 1] || 'Oktober';
+    return `${mName} ${year}`;
+  }
+
+  const d = safeParseDate(clean);
+  if (!isNaN(d.getTime())) {
+    const months = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    return `${months[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  return '';
+}
+
 export const TARGET_BLC_RATE = 1350.0; // Ton / Jam
 
 /**
@@ -7,7 +219,7 @@ export const TARGET_BLC_RATE = 1350.0; // Ton / Jam
  * a. Bersihkan spasi dan baris NaN
  * b. Standarisasi kolom kunci 'BG' menjadi uppercase
  * c. Left Join df_base2 dengan df_base berdasarkan ['BG', 'DD']
- * d. Ekstraksi Month_Year (contoh: "October 2026")
+ * d. Ekstraksi Month_Year (contoh: "Oktober 2026") mengutamakan Kolom D (DD)
  * e. Hitung Idle Time berurutan berdasarkan 'Cast off' menggunakan shift(1)
  * f. Hitung performa BLC: Waktu Target, Aktual Produktivitas, dan Status
  */
@@ -28,39 +240,65 @@ export function preprocessBargeData(
   // Buat lookup maps dari sheet BASE:
   // a. Menurut nomor urutan tongkang / Voyage No (Column A pada BASE dan BASE2)
   const baseMapByVoyage = new Map<string, number>();
+  const baseDateByVoyage = new Map<string, string>();
   // b. Menurut BG + DD
   const baseMapByBgDd = new Map<string, number>();
   // c. Menurut BG saja
   const baseMapByBg = new Map<string, number>();
+  const baseDateByBg = new Map<string, string>();
 
   validBase.forEach((item) => {
     const ton = Number(item['Ton/Rit']) || 0;
-    if (ton > 0) {
-      if (item.voyageNo && item.voyageNo.trim()) {
-        const vKey = item.voyageNo.trim().toUpperCase();
+    const d = item.DD ? item.DD.trim() : '';
+
+    if (item.voyageNo && item.voyageNo.trim()) {
+      const vKey = item.voyageNo.trim().toUpperCase();
+      if (ton > 0) {
         baseMapByVoyage.set(vKey, ton);
-        const intVal = parseInt(vKey, 10);
-        if (!isNaN(intVal)) {
-          baseMapByVoyage.set(String(intVal), ton);
-        }
       }
-      if (item.BG && item.BG.trim()) {
-        const cleanBg = item.BG.trim().toUpperCase();
-        if (item.DD && item.DD.trim()) {
-          baseMapByBgDd.set(`${cleanBg}__${item.DD.trim()}`, ton);
-        }
-        baseMapByBg.set(cleanBg, ton);
+      if (d) {
+        baseDateByVoyage.set(vKey, d);
       }
+      const intVal = parseInt(vKey, 10);
+      if (!isNaN(intVal)) {
+        if (ton > 0) baseMapByVoyage.set(String(intVal), ton);
+        if (d) baseDateByVoyage.set(String(intVal), d);
+      }
+    }
+    if (item.BG && item.BG.trim()) {
+      const cleanBg = item.BG.trim().toUpperCase();
+      if (item.DD && item.DD.trim() && ton > 0) {
+        baseMapByBgDd.set(`${cleanBg}__${item.DD.trim()}`, ton);
+      }
+      if (ton > 0) baseMapByBg.set(cleanBg, ton);
+      if (d) baseDateByBg.set(cleanBg, d);
     }
   });
 
   // 2. Left Join base2 dengan base (Muatan Tongkang diambil dari Kolom H Sheet BASE via Kolom A)
   const mergedRaw = validBase2.map((item, index) => {
     const cleanBg = (item.BG || '').trim().toUpperCase();
-    const cleanDd = (item.DD || '').trim();
+    let cleanDd = (item.DD || '').trim();
     const cleanVoyage = (item.voyageNo || '').trim().toUpperCase();
 
-    // Prioritas 1: Cocokkan via Column A (Nomor Urutan Tongkang / Voyage)
+    // Fallback Tanggal DD jika di sheet BASE2 kosong:
+    // 1. Ambil dari sheet BASE berdasarkan nomor urutan Voyage (Kolom A)
+    if (!cleanDd && cleanVoyage) {
+      cleanDd = baseDateByVoyage.get(cleanVoyage) || baseDateByVoyage.get(String(parseInt(cleanVoyage, 10))) || '';
+    }
+    // 2. Ambil dari sheet BASE berdasarkan nama tongkang (BG)
+    if (!cleanDd && cleanBg) {
+      cleanDd = baseDateByBg.get(cleanBg) || '';
+    }
+    // 3. Ambil dari actualDate atau Cast-in
+    if (!cleanDd && item.actualDate) {
+      cleanDd = item.actualDate.trim();
+    }
+    if (!cleanDd && item['Cast-in']) {
+      cleanDd = item['Cast-in'].split(' ')[0].trim();
+    }
+
+    // Prioritas 1: Cocokkan Muatan via Column A (Nomor Urutan Tongkang / Voyage)
     let tonRit = 0;
     if (cleanVoyage) {
       tonRit = baseMapByVoyage.get(cleanVoyage) || 0;
@@ -84,17 +322,24 @@ export function preprocessBargeData(
       tonRit = 8000;
     }
 
-    const castInDate = new Date(item['Cast-in']);
-    const castOffDate = new Date(item['Cast off']);
+    const castInDate = safeParseDate(item['Cast-in']);
+    const castOffDate = safeParseDate(item['Cast off']);
 
-    // Hitung Month_Year (Januari 2026 s/d Desember 2026)
-    const monthNamesId = [
-      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    const monthYear = !isNaN(castInDate.getTime())
-      ? `${monthNamesId[castInDate.getMonth()]} ${castInDate.getFullYear()}`
-      : 'Oktober 2026';
+    // Hitung Month_Year mengutamakan Kolom D (DD pemuatan tongkang)
+    let monthYear = '';
+    if (cleanDd) {
+      monthYear = getMonthYearFromDateString(cleanDd);
+    }
+    if (!monthYear && !isNaN(castInDate.getTime())) {
+      const months = [
+        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+      ];
+      monthYear = `${months[castInDate.getMonth()]} ${castInDate.getFullYear()}`;
+    }
+    if (!monthYear) {
+      monthYear = 'Semua Periode 2026';
+    }
 
     const loading = Number(item.Loading) || 0;
     const breakdown = Number(item.Breakdown) || 0;
