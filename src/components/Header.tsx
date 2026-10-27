@@ -24,8 +24,17 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Title & Brand */}
         <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-700 via-indigo-600 to-blue-500 flex items-center justify-center text-white shadow-md shadow-indigo-100 shrink-0">
-            <Ship className="w-6 h-6" />
+          <div className="h-12 px-2.5 py-1 rounded-2xl bg-white border border-slate-200/90 shadow-2xs flex items-center justify-center shrink-0">
+            <img
+              src="https://res.cloudinary.com/dgjnlxf69/image/upload/v1793075857/Logo_WBS_BLC_cqsna9.png"
+              alt="Logo PT WBS BLC"
+              className="h-9 w-auto object-contain max-w-[130px]"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                // Fallback to Ship icon if image fails to load
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           </div>
           <div>
             <div className="flex items-center gap-2">
