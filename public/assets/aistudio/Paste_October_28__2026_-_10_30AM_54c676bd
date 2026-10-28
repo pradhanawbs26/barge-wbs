@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Port Operations & Coal Loading Management System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js CDN for charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", sans-serif;
+    }
+
+    body {
+      font-family: var(--font-apple);
+      background-color: #F5F5F7;
+      color: #1D1D1F;
+      letter-spacing: -0.011em;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Apple-grade glassmorphism */
+    .cupertino-glass {
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(25px) saturate(180%);
+      -webkit-backdrop-filter: blur(25px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+    }
+
+    .sidebar-glass {
+      background: rgba(246, 246, 248, 0.82);
+      backdrop-filter: blur(30px) saturate(190%);
+      -webkit-backdrop-filter: blur(30px) saturate(190%);
+      border-right: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    /* Apple continuous rounded squircle shadow */
+    .apple-card {
+      background: #FFFFFF;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02);
+      border: 1px solid rgba(0, 0, 0, 0.03);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .apple-card:hover {
+      box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.06), 0 4px 10px -2px rgba(0, 0, 0, 0.03);
+    }
+
+    /* Custom smooth scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    /* Status badge styles according to Apple System Colors */
+    .badge-system-green {
+      background-color: rgba(52, 199, 89, 0.12);
+      color: #248A3D;
+      border: 1px solid rgba(52, 199, 89, 0.25);
+    }
+    .badge-system-red {
+      background-color: rgba(255, 59, 48, 0.12);
+      color: #D70015;
+      border: 1px solid rgba(255, 59, 48, 0.25);
+    }
+    .badge-system-amber {
+      background-color: rgba(255, 149, 0, 0.12);
+      color: #C97000;
+      border: 1px solid rgba(255, 149, 0, 0.25);
+    }
+    .badge-system-blue {
+      background-color: rgba(0, 122, 255, 0.12);
+      color: #0062CC;
+      border: 1px solid rgba(0, 122, 255, 0.22);
+    }
+
+    /* Speedometer SVG stroke transitions */
+    .gauge-needle {
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transform-origin: 100px 95px;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex overflow-hidden select-none">
+
+  <!-- ==================== GLOBAL SIDEBAR (Frosted Glass) ==================== -->
+  <aside class="sidebar-glass w-72 flex-shrink-0 flex flex-col justify-between p-5 z-20">
+    <div>
+      <!-- Brand & Header -->
+      <div class="flex items-center space-x-3 px-2 py-3 mb-6">
+        <div class="w-10 h-10 rounded-2xl bg-[#007AFF] flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="anchor" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-[15px] font-semibold text-[#1D1D1F] tracking-tight leading-tight">PortFlow OS</h1>
+          <p class="text-[11px] font-medium text-[#86868B] tracking-tight">Coal Loading Operations</p>
+        </div>
+      </div>
+
+      <!-- CRITICAL GLOBAL MONTH FILTER -->
+      <div class="mb-6 px-2">
+        <label class="block text-[11px] font-semibold tracking-wider text-[#86868B] uppercase mb-2">
+          Operations Period
+        </label>
+        <div class="relative">
+          <select id="globalMonthSelect" onchange="switchMonth(this.value)" 
+                  class="w-full appearance-none bg-white/90 border border-black/[0.08] text-[#1D1D1F] font-semibold text-[13px] rounded-xl px-3.5 py-2.5 pr-8 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30 focus:border-[#007AFF] shadow-sm cursor-pointer transition-all">
+            <option value="2026-10" selected>October 2026 (Active)</option>
+            <option value="2026-09">September 2026</option>
+            <option value="2026-08">August 2026</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#86868B]">
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <p class="text-[10px] text-[#86868B] mt-1.5 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#34C759] inline-block animate-pulse"></span>
+          Auto-synced with BASE & BASE2 logs
+        </p>
+      </div>
+
+      <!-- Navigation links -->
+      <nav class="space-y-1">
+        <div class="text-[10px] font-semibold tracking-wider text-[#86868B] uppercase px-3 py-1">Main Views</div>
+        <a href="#" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl bg-black/[0.05] text-[#007AFF] font-medium text-[13px] transition-colors">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-[#007AFF]"></i>
+          <span>Coal Loading Overview</span>
+        </a>
+        <a href="#ganttSection" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-[#48484A] hover:bg-black/[0.03] font-medium text-[13px] transition-colors">
+          <i data-lucide="calendar-range" class="w-4 h-4 text-[#86868B]"></i>
+          <span>Berth & Gantt Timeline</span>
+        </a>
+        <a href="#productivitySection" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-[#48484A] hover:bg-black/[0.03] font-medium text-[13px] transition-colors">
+          <i data-lucide="gauge" class="w-4 h-4 text-[#86868B]"></i>
+          <span>BLC & Delay Analytics</span>
+        </a>
+        <a href="#bargeTableSection" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl text-[#48484A] hover:bg-black/[0.03] font-medium text-[13px] transition-colors">
+          <i data-lucide="ship" class="w-4 h-4 text-[#86868B]"></i>
+          <span>Barge Manifest Registry</span>
+        </a>
+      </nav>
+
+      <div class="mt-8 px-2">
+        <div class="text-[10px] font-semibold tracking-wider text-[#86868B] uppercase px-1 mb-2">Live Terminal Status</div>
+        <div class="p-3 bg-white/70 rounded-2xl border border-black/[0.04] space-y-2 text-xs">
+          <div class="flex justify-between items-center">
+            <span class="text-[#86868B]">Conveyor Line 01</span>
+            <span class="text-[#34C759] font-medium flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span> Operational</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#86868B]">Chute / Shiploader</span>
+            <span class="text-[#34C759] font-medium flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-[#34C759]"></span> Active (BLC-2)</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-[#86868B]">Weather Condition</span>
+            <span class="text-[#007AFF] font-medium flex items-center gap-1"><i data-lucide="sun" class="w-3 h-3"></i> Clear (29°C)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom User Profile / Machine ID -->
+    <div class="pt-4 border-t border-black/[0.05] px-2 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-200 to-gray-400 flex items-center justify-center text-xs font-semibold text-gray-700">
+          OC
+        </div>
+        <div>
+          <div class="text-[12px] font-semibold text-[#1D1D1F]">Capt. Henderson</div>
+          <div class="text-[10px] text-[#86868B]">Terminal Superintendent</div>
+        </div>
+      </div>
+      <button class="text-[#86868B] hover:text-[#1D1D1F] transition-colors p-1" title="Settings">
+        <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ==================== MAIN CONTENT AREA ==================== -->
+  <main class="flex-1 overflow-y-auto px-8 py-7 space-y-7">
+    
+    <!-- Top Bar: Title & Apple Quick Action Controls -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-1">
+      <div>
+        <div class="flex items-center gap-2 text-xs text-[#86868B] font-medium">
+          <span>Terminal Hub</span>
+          <i data-lucide="chevron-right" class="w-3 h-3"></i>
+          <span>Jetty 03 (Coal Terminal)</span>
+          <i data-lucide="chevron-right" class="w-3 h-3"></i>
+          <span class="text-[#1D1D1F]" id="breadcrumbPeriod">October 2026</span>
+        </div>
+        <h2 class="text-2xl font-bold tracking-tight text-[#1D1D1F] mt-1">
+          Port Operations & Coal Loading Dashboard
+        </h2>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span class="px-3 py-1.5 rounded-full text-xs font-medium cupertino-glass text-[#48484A] flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-[#007AFF]"></i>
+          <span id="mergedRowsLabel">Merged BASE + BASE2: 8 Barges</span>
+        </span>
+        <button onclick="exportReport()" class="px-4 py-2 rounded-xl bg-[#007AFF] text-white text-xs font-semibold shadow-md shadow-blue-500/20 hover:bg-[#0071E3] active:scale-[0.98] transition-all flex items-center gap-1.5">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Export Summary</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ==================== ROW 1: EXECUTIVE KPIs ==================== -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- KPI 1: Total Volume -->
+      <div class="apple-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-[#86868B] mb-2">
+          <span class="text-xs font-medium tracking-tight">Total Volume (MT)</span>
+          <div class="w-7 h-7 rounded-full bg-blue-50 flex items-center justify-center text-[#007AFF]">
+            <i data-lucide="layers" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-bold tracking-tight text-[#1D1D1F]" id="kpiTotalVolume">64,250</span>
+          <span class="text-xs font-semibold text-[#86868B]">MT</span>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-[#34C759] font-medium">
+          <i data-lucide="trending-up" class="w-3.5 h-3.5 mr-1"></i>
+          <span>+6.4% vs prev. cycle</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: Avg Loading Rate -->
+      <div class="apple-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-[#86868B] mb-2">
+          <span class="text-xs font-medium tracking-tight">Avg Loading Rate</span>
+          <div class="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center text-[#34C759]">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-bold tracking-tight text-[#1D1D1F]" id="kpiLoadingRate">1,392</span>
+          <span class="text-xs font-semibold text-[#86868B]">Ton / Hour</span>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-[#34C759] font-medium">
+          <i data-lucide="check-circle" class="w-3.5 h-3.5 mr-1"></i>
+          <span>+42 Ton/h above 1350 goal</span>
+        </div>
+      </div>
+
+      <!-- KPI 3: Avg Idle Time -->
+      <div class="apple-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-[#86868B] mb-2">
+          <span class="text-xs font-medium tracking-tight">Avg Idle Time</span>
+          <div class="w-7 h-7 rounded-full bg-amber-50 flex items-center justify-center text-[#FF9500]">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-bold tracking-tight text-[#1D1D1F]" id="kpiIdleTime">48</span>
+          <span class="text-xs font-semibold text-[#86868B]">Minutes / Barge</span>
+        </div>
+        <div class="mt-3 flex items-center text-xs text-[#34C759] font-medium">
+          <i data-lucide="arrow-down-right" class="w-3.5 h-3.5 mr-1"></i>
+          <span>-12 min mooring turn-time</span>
+        </div>
+      </div>
+
+      <!-- KPI 4: BLC Productivity vs Target -->
+      <div class="apple-card p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-[#86868B] mb-2">
+          <span class="text-xs font-medium tracking-tight">BLC Productivity</span>
+          <div class="w-7 h-7 rounded-full bg-purple-50 flex items-center justify-center text-purple-600">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl font-bold tracking-tight text-[#1D1D1F]" id="kpiProductivity">103.1%</span>
+          <span class="text-xs font-semibold text-[#86868B]">vs 1,350 Target</span>
+        </div>
+        <div class="mt-3 flex items-center text-xs font-medium text-[#248A3D] flex gap-1">
+          <span class="px-2 py-0.5 rounded-md badge-system-green text-[10px] font-semibold">Sesuai Target</span>
+          <span class="text-[#86868B]">Overall Status</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ROW 2: TIMELINE (Operational Gantt Chart) ==================== -->
+    <section id="ganttSection" class="apple-card p-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-5 gap-3">
+        <div>
+          <h3 class="text-[16px] font-semibold text-[#1D1D1F] tracking-tight flex items-center gap-2">
+            <span>Operational Gantt Chart — Jetty Conveyor Berth 1</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-black/[0.05] text-[#86868B] font-medium">Time Horizon: 48h Shift Window</span>
+          </h3>
+          <p class="text-xs text-[#86868B] mt-0.5">
+            X-axis represents continuous timeline. Visualizing active loading runs, operational delays, and idle mooring buffer gaps.
+          </p>
+        </div>
+
+        <!-- Legend -->
+        <div class="flex items-center gap-4 text-xs font-medium">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-md bg-[#007AFF]"></span>
+            <span class="text-[#48484A]">Coal Loading</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-md bg-[#FF3B30]"></span>
+            <span class="text-[#48484A]">Controllable Delay</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-md bg-[#FF9500]"></span>
+            <span class="text-[#48484A]">Weather / Rain Delay</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-md bg-gray-200 border border-dashed border-gray-400"></span>
+            <span class="text-[#86868B]">Idle Turnaround</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gantt Interactive Container -->
+      <div class="relative overflow-x-auto border border-black/[0.06] rounded-2xl bg-[#FAFAFC] p-4">
+        
+        <!-- Timeline Header Markers (00:00 to 44:00 hours) -->
+        <div class="grid grid-cols-12 gap-1 pb-2 border-b border-black/[0.06] text-[10px] text-[#86868B] font-semibold text-center pl-44">
+          <div>Day 1 00:00</div>
+          <div>04:00</div>
+          <div>08:00</div>
+          <div>12:00</div>
+          <div>16:00</div>
+          <div>20:00</div>
+          <div>Day 2 00:00</div>
+          <div>04:00</div>
+          <div>08:00</div>
+          <div>12:00</div>
+          <div>16:00</div>
+          <div>20:00</div>
+        </div>
+
+        <!-- Barges Rows -->
+        <div id="ganttRowsContainer" class="space-y-3 pt-3">
+          <!-- Populated by JavaScript according to chosen month -->
+        </div>
+      </div>
+      
+      <div class="flex items-center justify-between text-xs text-[#86868B] mt-3 px-1">
+        <span class="flex items-center gap-1">
+          <i data-lucide="info" class="w-3.5 h-3.5 text-[#007AFF]"></i>
+          Hover on bar segments to inspect detailed coal tonnage, delay causation, and duration.
+        </span>
+        <span>Average Berth Occupancy Rate: <strong class="text-[#1D1D1F]">88.4%</strong></span>
+      </div>
+    </section>
+
+    <!-- ==================== ROW 3: SPLIT VIEW (Speedometer Gauge + Pareto Delay Chart) ==================== -->
+    <section id="productivitySection" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- LEFT: Speedometer Gauge Chart (BLC Productivity) -->
+      <div class="lg:col-span-5 apple-card p-6 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-[16px] font-semibold text-[#1D1D1F] tracking-tight">BLC Productivity Speedometer</h3>
+              <p class="text-xs text-[#86868B] mt-0.5">Bucket Loader & Conveyor throughput against rated capacity</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full text-xs font-semibold badge-system-green" id="gaugeStatusBadge">
+              Sesuai Target
+            </span>
+          </div>
+          
+          <div class="mt-4 flex flex-col items-center justify-center">
+            <!-- Custom Apple-styled SVG Speedometer Gauge -->
+            <div class="relative w-72 h-44 flex items-center justify-center">
+              <svg viewBox="0 0 200 120" class="w-full h-full overflow-visible">
+                <defs>
+                  <!-- Red Zone Gradient -->
+                  <linearGradient id="redZoneGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#FF3B30" />
+                    <stop offset="100%" stop-color="#FF9500" />
+                  </linearGradient>
+                  <!-- Green Zone Gradient -->
+                  <linearGradient id="greenZoneGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#34C759" />
+                    <stop offset="100%" stop-color="#30D158" />
+                  </linearGradient>
+                  <filter id="needleGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.25"/>
+                  </filter>
+                </defs>
+
+                <!-- Background Track (Gray) -->
+                <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#E5E5EA" stroke-width="16" stroke-linecap="round" />
+
+                <!-- Red/Under-target Arc (0 to 1350 Ton/h, which is 65% of 2000 scale) -->
+                <!-- Angle span 180 deg: from -180 deg to 0 deg -->
+                <!-- Red Arc (0 to ~1350) -->
+                <path d="M 20 100 A 80 80 0 0 1 140 32" fill="none" stroke="url(#redZoneGrad)" stroke-width="16" stroke-linecap="round" />
+
+                <!-- Green/Optimal Arc (1350 to 2000 Ton/h) -->
+                <path d="M 140 32 A 80 80 0 0 1 180 100" fill="none" stroke="url(#greenZoneGrad)" stroke-width="16" stroke-linecap="round" />
+
+                <!-- Target Milestone Indicator (1,350 T/H) -->
+                <line x1="140" y1="32" x2="148" y2="24" stroke="#1D1D1F" stroke-width="2.5" stroke-linecap="round"/>
+                <text x="135" y="15" font-size="7" font-weight="700" fill="#1D1D1F" text-anchor="middle">TARGET 1,350</text>
+
+                <!-- Tick labels -->
+                <text x="18" y="114" font-size="7" fill="#86868B" font-weight="600">0</text>
+                <text x="50" y="55" font-size="7" fill="#86868B" font-weight="500">600</text>
+                <text x="100" y="32" font-size="7" fill="#86868B" font-weight="500">1000</text>
+                <text x="182" y="114" font-size="7" fill="#86868B" font-weight="600">2000</text>
+
+                <!-- Needle -->
+                <!-- Default rotates from 0deg (pointing left = 0 T/H) to 180deg (pointing right = 2000 T/H) -->
+                <g id="speedoNeedleGroup" class="gauge-needle" style="transform: rotate(125deg); transform-origin: 100px 95px;">
+                  <polygon points="98,95 102,95 100.8,25 99.2,25" fill="#1D1D1F" filter="url(#needleGlow)" />
+                  <circle cx="100" cy="95" r="7" fill="#1D1D1F" />
+                  <circle cx="100" cy="95" r="3" fill="#FFFFFF" />
+                </g>
+              </svg>
+
+              <!-- Digital Value Inset -->
+              <div class="absolute bottom-1 text-center">
+                <div class="text-3xl font-extrabold tracking-tight text-[#1D1D1F]" id="gaugeCurrentVal">1,392</div>
+                <div class="text-[11px] font-semibold text-[#86868B]">Ton / Hour Achieved</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gauge Summary Metrics Footnote -->
+        <div class="mt-4 pt-4 border-t border-black/[0.05] grid grid-cols-2 gap-3 text-center">
+          <div class="bg-gray-50/80 rounded-xl p-2.5">
+            <span class="text-[10px] text-[#86868B] block font-medium">Standard Rated Goal</span>
+            <span class="text-sm font-bold text-[#1D1D1F]">1,350 T/H</span>
+          </div>
+          <div class="bg-gray-50/80 rounded-xl p-2.5">
+            <span class="text-[10px] text-[#86868B] block font-medium">Variance (Delta)</span>
+            <span class="text-sm font-bold text-[#248A3D]" id="gaugeVariance">+42.0 T/H (+3.1%)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Pareto Bar Chart (Delay Breakdown) -->
+      <div class="lg:col-span-7 apple-card p-6 flex flex-col justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h3 class="text-[16px] font-semibold text-[#1D1D1F] tracking-tight">Pareto Delay Breakdown</h3>
+            <p class="text-xs text-[#86868B] mt-0.5">Highest-to-lowest root causes categorized by Controllable vs Uncontrollable</p>
+          </div>
+          <!-- Legend Badges -->
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold badge-system-red flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#FF3B30]"></span> Controllable
+            </span>
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold badge-system-amber flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-[#FF9500]"></span> Uncontrollable
+            </span>
+          </div>
+        </div>
+
+        <!-- Chart Container -->
+        <div class="relative h-64 w-full">
+          <canvas id="paretoChartCanvas"></canvas>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-black/[0.05] flex items-center justify-between text-xs text-[#86868B]">
+          <span>Pareto 80/20 insight: Top 2 causes represent <strong class="text-[#1D1D1F]" id="topTwoDelayPct">71.4%</strong> of lost hours</span>
+          <button onclick="toggleParetoView()" class="text-[#007AFF] font-medium hover:underline flex items-center gap-1">
+            <span>View Root Cause Action Plan</span>
+            <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ROW 4: DATA TABLE (Barge Manifest Registry) ==================== -->
+    <section id="bargeTableSection" class="apple-card p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-[16px] font-semibold text-[#1D1D1F] tracking-tight flex items-center gap-2">
+            <span>Barge Operations Manifest</span>
+            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#007AFF] border border-blue-100" id="tableFilterTag">
+              October 2026 Fleet
+            </span>
+          </h3>
+          <p class="text-xs text-[#86868B] mt-0.5">
+            Merged dataset linking BASE (coal volume & tonnage) and BASE2 (cycle timestamps, durations, and status classification).
+          </p>
+        </div>
+
+        <!-- Table Filters / Search -->
+        <div class="flex items-center gap-2">
+          <div class="relative">
+            <input type="text" id="bargeSearchInput" onkeyup="filterTable()" placeholder="Search barge or tug..."
+                   class="w-48 sm:w-60 bg-black/[0.03] border border-black/[0.06] rounded-xl px-3 py-1.5 pl-8 text-xs text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/30 focus:border-[#007AFF]">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-[#86868B] absolute left-2.5 top-2"></i>
+          </div>
+          <select id="statusFilter" onchange="filterTable()" class="bg-black/[0.03] border border-black/[0.06] text-xs font-medium rounded-xl px-2.5 py-1.5 text-[#48484A] focus:outline-none">
+            <option value="ALL">All Statuses</option>
+            <option value="Sesuai Target">Sesuai Target</option>
+            <option value="Over Time">Over Time</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Minimalist Apple Cupertino Table -->
+      <div class="overflow-x-auto rounded-xl border border-black/[0.05]">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-black/[0.02] border-b border-black/[0.05] text-[#86868B] font-semibold tracking-tight">
+              <th class="py-3 px-4">Barge & Tug Identifier</th>
+              <th class="py-3 px-4">Coal Spec / Grade</th>
+              <th class="py-3 px-4 text-right">Volume (MT)</th>
+              <th class="py-3 px-4 text-right">Target Loading Time</th>
+              <th class="py-3 px-4 text-right">Actual Elapsed Time</th>
+              <th class="py-3 px-4 text-right">Effective Rate</th>
+              <th class="py-3 px-4 text-center">Operational Status</th>
+              <th class="py-3 px-4 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="bargeTableBody" class="divide-y divide-black/[0.04] bg-white">
+            <!-- Rendered by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Table Pagination / Footer -->
+      <div class="flex flex-col sm:flex-row items-center justify-between text-xs text-[#86868B] mt-4 pt-2">
+        <span id="tableEntriesSummary">Showing 8 of 8 barges logged for this operational window</span>
+        <div class="flex items-center gap-1.5 mt-2 sm:mt-0">
+          <button class="px-2.5 py-1 rounded-lg border border-black/[0.08] hover:bg-black/[0.03] font-medium text-[#1D1D1F] transition-colors" disabled>Previous</button>
+          <span class="px-2.5 py-1 rounded-lg bg-[#007AFF] text-white font-semibold">1</span>
+          <button class="px-2.5 py-1 rounded-lg border border-black/[0.08] hover:bg-black/[0.03] font-medium text-[#1D1D1F] transition-colors">Next</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODAL: DETAILED BARGE LOGS ==================== -->
+  <div id="bargeDetailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm hidden">
+    <div class="apple-card w-full max-w-lg p-6 m-4 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div class="flex justify-between items-start">
+        <div>
+          <div class="text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">Barge Telemetry Sheet</div>
+          <h4 class="text-xl font-bold text-[#1D1D1F]" id="modalBargeName">BG. PACIFIC 3008</h4>
+          <p class="text-xs text-[#86868B]" id="modalTugName">Tug: TB. Trans Ocean 02</p>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-black/[0.05] hover:bg-black/[0.1] flex items-center justify-center text-[#86868B] hover:text-[#1D1D1F]">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div class="p-3 bg-gray-50 rounded-xl">
+          <span class="text-[#86868B] block">Coal Gross Weight</span>
+          <span class="text-base font-bold text-[#1D1D1F]" id="modalVolume">8,200 MT</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-xl">
+          <span class="text-[#86868B] block">Conveyor Gross Rate</span>
+          <span class="text-base font-bold text-[#1D1D1F]" id="modalRate">1,414 T/H</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-xl">
+          <span class="text-[#86868B] block">Target Duration</span>
+          <span class="text-sm font-semibold text-[#1D1D1F]" id="modalTarget">06h 04m</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-xl">
+          <span class="text-[#86868B] block">Actual Duration</span>
+          <span class="text-sm font-semibold text-[#1D1D1F]" id="modalActual">05h 48m</span>
+        </div>
+      </div>
+
+      <div class="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl text-xs space-y-1">
+        <div class="font-semibold text-[#007AFF] flex items-center gap-1.5">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <span>BASE & BASE2 Cross-Audit Verification</span>
+        </div>
+        <p class="text-[#48484A]" id="modalAuditText">
+          All hopper load-cell sensors matches draft survey readings within 0.12% variance tolerance.
+        </p>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeModal()" class="px-4 py-2 bg-[#1D1D1F] text-white text-xs font-semibold rounded-xl hover:bg-black transition-all">
+          Close Window
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SCRIPT & DATA LOGIC ==================== -->
+  <script>
+    // Robust Mock Data simulating merged BASE (Volume, Spec) + BASE2 (Duration, Delays, Dates)
+    const monthlyDataStore = {
+      "2026-10": {
+        periodLabel: "October 2026",
+        kpis: {
+          totalVolume: "64,250",
+          loadingRate: "1,392",
+          idleTime: "48",
+          blcProductivity: "103.1%",
+          isTargetMet: true,
+          deltaText: "+42.0 T/H (+3.1%)"
+        },
+        speedoAngle: 125, // 0 deg = 0 T/H, 180 deg = 2000 T/H. 1392 T/H is ~125.28 deg
+        barges: [
+          {
+            id: "BG-101",
+            name: "BG. PACIFIC 3008",
+            tug: "TB. Trans Ocean 02",
+            spec: "GAR 4200 Low Ash",
+            volume: 8200,
+            targetHours: 6.07,
+            actualHours: 5.80,
+            loadingRate: 1414,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 1,
+              loadDuration: 5.8,
+              delayDuration: 0.5,
+              delayType: "controllable", // Breakdown / chute check
+              delayLabel: "Chute Jam Check (30m)",
+              idleGap: 1.2
+            }
+          },
+          {
+            id: "BG-102",
+            name: "BG. MARITIM 330",
+            tug: "TB. Segara 08",
+            spec: "GAR 3800 Sub-Bit",
+            volume: 8000,
+            targetHours: 5.92,
+            actualHours: 7.40,
+            loadingRate: 1081,
+            status: "Over Time",
+            gantt: {
+              startHour: 8.5,
+              loadDuration: 5.0,
+              delayDuration: 2.4,
+              delayType: "uncontrollable", // Heavy Rain
+              delayLabel: "Torrential Rain (2.4h)",
+              idleGap: 1.5
+            }
+          },
+          {
+            id: "BG-103",
+            name: "BG. KALIMANTAN 09",
+            tug: "TB. Antasena 14",
+            spec: "GAR 4800 High CV",
+            volume: 7500,
+            targetHours: 5.55,
+            actualHours: 5.10,
+            loadingRate: 1470,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 17.4,
+              loadDuration: 5.1,
+              delayDuration: 0,
+              delayType: null,
+              delayLabel: "None",
+              idleGap: 0.8
+            }
+          },
+          {
+            id: "BG-104",
+            name: "BG. TRANS COAL 28",
+            tug: "TB. Mitra Bahari",
+            spec: "GAR 4200 Low Ash",
+            volume: 8400,
+            targetHours: 6.22,
+            actualHours: 6.00,
+            loadingRate: 1400,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 23.3,
+              loadDuration: 6.0,
+              delayDuration: 0.4,
+              delayType: "controllable",
+              delayLabel: "Winch Re-positioning",
+              idleGap: 1.1
+            }
+          },
+          {
+            id: "BG-105",
+            name: "BG. BUMI JAYA 312",
+            tug: "TB. Surya Jaya 01",
+            spec: "GAR 3400 Eco Coal",
+            volume: 7800,
+            targetHours: 5.77,
+            actualHours: 7.10,
+            loadingRate: 1098,
+            status: "Over Time",
+            gantt: {
+              startHour: 30.8,
+              loadDuration: 5.1,
+              delayDuration: 2.0,
+              delayType: "controllable",
+              delayLabel: "Conveyor Belt Tear Repair (2h)",
+              idleGap: 1.4
+            }
+          },
+          {
+            id: "BG-106",
+            name: "BG. ENERGY 301",
+            tug: "TB. Ocean Prime",
+            spec: "GAR 4200 Low Ash",
+            volume: 8150,
+            targetHours: 6.03,
+            actualHours: 5.60,
+            loadingRate: 1455,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 39.3,
+              loadDuration: 5.6,
+              delayDuration: 0,
+              delayType: null,
+              delayLabel: "Clean Transfer",
+              idleGap: 0.9
+            }
+          },
+          {
+            id: "BG-107",
+            name: "BG. SUMBER BARU 05",
+            tug: "TB. Perkasa 22",
+            spec: "GAR 5000 Thermal",
+            volume: 8000,
+            targetHours: 5.92,
+            actualHours: 5.75,
+            loadingRate: 1391,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 45.8,
+              loadDuration: 5.75,
+              delayDuration: 0.3,
+              delayType: "controllable",
+              delayLabel: "Draft Survey Check",
+              idleGap: 1.0
+            }
+          },
+          {
+            id: "BG-108",
+            name: "BG. NUSANTARA 32",
+            tug: "TB. Mandiri 07",
+            spec: "GAR 4200 Low Ash",
+            volume: 8200,
+            targetHours: 6.07,
+            actualHours: 5.90,
+            loadingRate: 1389,
+            status: "Sesuai Target",
+            gantt: {
+              startHour: 52.5,
+              loadDuration: 5.9,
+              delayDuration: 0,
+              delayType: null,
+              delayLabel: "None",
+              idleGap: 1.2
+            }
+          }
+        ],
+        delays: [
+          { reason: "Heavy Rain (Wet Coal Stoppage)", hours: 14.5, type: "uncontrollable" },
+          { reason: "Conveyor Belt Tripping / Mechanical", hours: 11.2, type: "controllable" },
+          { reason: "Waiting for Tug Assistance / Mooring", hours: 6.8, type: "controllable" },
+          { reason: "Stacker Reclaimer Hopper Starvation", hours: 4.1, type: "controllable" },
+          { reason: "Draft Survey & Final Inspection Delay", hours: 2.4, type: "controllable" }
+        ]
+      },
+
+      "2026-09": {
+        periodLabel: "September 2026",
+        kpis: {
+          totalVolume: "58,400",
+          loadingRate: "1,310",
+          idleTime: "62",
+          blcProductivity: "97.0%",
+          isTargetMet: false,
+          deltaText: "-40.0 T/H (-3.0%)"
+        },
+        speedoAngle: 117.9, // 1310 T/H
+        barges: [
+          {
+            id: "BG-091",
+            name: "BG. PACIFIC 3008",
+            tug: "TB. Trans Ocean 02",
+            spec: "GAR 4200 Low Ash",
+            volume: 8100,
+            targetHours: 6.00,
+            actualHours: 6.40,
+            loadingRate: 1265,
+            status: "Over Time",
+            gantt: { startHour: 1, loadDuration: 5.2, delayDuration: 1.2, delayType: "controllable", delayLabel: "Idler Roller Jam", idleGap: 2.1 }
+          },
+          {
+            id: "BG-092",
+            name: "BG. MARITIM 330",
+            tug: "TB. Segara 08",
+            spec: "GAR 3800 Sub-Bit",
+            volume: 8000,
+            targetHours: 5.92,
+            actualHours: 6.80,
+            loadingRate: 1176,
+            status: "Over Time",
+            gantt: { startHour: 9.3, loadDuration: 5.0, delayDuration: 1.8, delayType: "uncontrollable", delayLabel: "Thunderstorm warning", idleGap: 1.5 }
+          },
+          {
+            id: "BG-093",
+            name: "BG. TRANS COAL 28",
+            tug: "TB. Mitra Bahari",
+            spec: "GAR 4200 Low Ash",
+            volume: 8300,
+            targetHours: 6.14,
+            actualHours: 5.95,
+            loadingRate: 1394,
+            status: "Sesuai Target",
+            gantt: { startHour: 17.6, loadDuration: 5.95, delayDuration: 0, delayType: null, delayLabel: "Normal", idleGap: 1.0 }
+          },
+          {
+            id: "BG-094",
+            name: "BG. BUMI JAYA 312",
+            tug: "TB. Surya Jaya 01",
+            spec: "GAR 3400 Eco Coal",
+            volume: 7700,
+            targetHours: 5.70,
+            actualHours: 6.30,
+            loadingRate: 1222,
+            status: "Over Time",
+            gantt: { startHour: 24.5, loadDuration: 5.1, delayDuration: 1.2, delayType: "controllable", delayLabel: "Chute Clogging", idleGap: 1.8 }
+          },
+          {
+            id: "BG-095",
+            name: "BG. KALIMANTAN 09",
+            tug: "TB. Antasena 14",
+            spec: "GAR 4800 High CV",
+            volume: 8100,
+            targetHours: 6.00,
+            actualHours: 5.80,
+            loadingRate: 1396,
+            status: "Sesuai Target",
+            gantt: { startHour: 32.6, loadDuration: 5.8, delayDuration: 0, delayType: null, delayLabel: "Optimal", idleGap: 1.2 }
+          },
+          {
+            id: "BG-096",
+            name: "BG. ENERGY 301",
+            tug: "TB. Ocean Prime",
+            spec: "GAR 4200 Low Ash",
+            volume: 8200,
+            targetHours: 6.07,
+            actualHours: 6.50,
+            loadingRate: 1261,
+            status: "Over Time",
+            gantt: { startHour: 39.6, loadDuration: 5.3, delayDuration: 1.2, delayType: "uncontrollable", delayLabel: "High Tidal Wave", idleGap: 1.0 }
+          },
+          {
+            id: "BG-097",
+            name: "BG. NUSANTARA 32",
+            tug: "TB. Mandiri 07",
+            spec: "GAR 4200 Low Ash",
+            volume: 8000,
+            targetHours: 5.92,
+            actualHours: 5.70,
+            loadingRate: 1403,
+            status: "Sesuai Target",
+            gantt: { startHour: 47.1, loadDuration: 5.7, delayDuration: 0, delayType: null, delayLabel: "Clean run", idleGap: 1.1 }
+          }
+        ],
+        delays: [
+          { reason: "Heavy Rain (Wet Coal Stoppage)", hours: 19.8, type: "uncontrollable" },
+          { reason: "Conveyor Belt Tripping / Mechanical", hours: 14.5, type: "controllable" },
+          { reason: "Waiting for Tug Assistance / Mooring", hours: 9.2, type: "controllable" },
+          { reason: "Stacker Reclaimer Hopper Starvation", hours: 5.6, type: "controllable" },
+          { reason: "Draft Survey & Final Inspection Delay", hours: 3.1, type: "controllable" }
+        ]
+      },
+
+      "2026-08": {
+        periodLabel: "August 2026",
+        kpis: {
+          totalVolume: "67,100",
+          loadingRate: "1,425",
+          idleTime: "41",
+          blcProductivity: "105.5%",
+          isTargetMet: true,
+          deltaText: "+75.0 T/H (+5.5%)"
+        },
+        speedoAngle: 128.25, // 1425 T/H
+        barges: [
+          {
+            id: "BG-081",
+            name: "BG. PACIFIC 3008",
+            tug: "TB. Trans Ocean 02",
+            spec: "GAR 4200 Low Ash",
+            volume: 8400,
+            targetHours: 6.22,
+            actualHours: 5.80,
+            loadingRate: 1448,
+            status: "Sesuai Target",
+            gantt: { startHour: 1, loadDuration: 5.8, delayDuration: 0, delayType: null, delayLabel: "Flawless", idleGap: 0.9 }
+          },
+          {
+            id: "BG-082",
+            name: "BG. MARITIM 330",
+            tug: "TB. Segara 08",
+            spec: "GAR 3800 Sub-Bit",
+            volume: 8300,
+            targetHours: 6.14,
+            actualHours: 5.85,
+            loadingRate: 1418,
+            status: "Sesuai Target",
+            gantt: { startHour: 7.7, loadDuration: 5.85, delayDuration: 0, delayType: null, delayLabel: "Clean", idleGap: 0.8 }
+          },
+          {
+            id: "BG-083",
+            name: "BG. KALIMANTAN 09",
+            tug: "TB. Antasena 14",
+            spec: "GAR 4800 High CV",
+            volume: 8500,
+            targetHours: 6.29,
+            actualHours: 5.90,
+            loadingRate: 1440,
+            status: "Sesuai Target",
+            gantt: { startHour: 14.3, loadDuration: 5.9, delayDuration: 0.3, delayType: "controllable", delayLabel: "Winch Slack", idleGap: 0.9 }
+          },
+          {
+            id: "BG-084",
+            name: "BG. TRANS COAL 28",
+            tug: "TB. Mitra Bahari",
+            spec: "GAR 4200 Low Ash",
+            volume: 8400,
+            targetHours: 6.22,
+            actualHours: 6.80,
+            loadingRate: 1235,
+            status: "Over Time",
+            gantt: { startHour: 21.4, loadDuration: 5.5, delayDuration: 1.3, delayType: "controllable", delayLabel: "Motor Overheat", idleGap: 1.2 }
+          },
+          {
+            id: "BG-085",
+            name: "BG. BUMI JAYA 312",
+            tug: "TB. Surya Jaya 01",
+            spec: "GAR 3400 Eco Coal",
+            volume: 8100,
+            targetHours: 6.00,
+            actualHours: 5.65,
+            loadingRate: 1433,
+            status: "Sesuai Target",
+            gantt: { startHour: 29.4, loadDuration: 5.65, delayDuration: 0, delayType: null, delayLabel: "Optimal", idleGap: 0.7 }
+          },
+          {
+            id: "BG-086",
+            name: "BG. ENERGY 301",
+            tug: "TB. Ocean Prime",
+            spec: "GAR 4200 Low Ash",
+            volume: 8400,
+            targetHours: 6.22,
+            actualHours: 5.80,
+            loadingRate: 1448,
+            status: "Sesuai Target",
+            gantt: { startHour: 35.7, loadDuration: 5.8, delayDuration: 0, delayType: null, delayLabel: "Flawless", idleGap: 0.8 }
+          },
+          {
+            id: "BG-087",
+            name: "BG. SUMBER BARU 05",
+            tug: "TB. Perkasa 22",
+            spec: "GAR 5000 Thermal",
+            volume: 8500,
+            targetHours: 6.29,
+            actualHours: 5.95,
+            loadingRate: 1428,
+            status: "Sesuai Target",
+            gantt: { startHour: 42.3, loadDuration: 5.95, delayDuration: 0, delayType: null, delayLabel: "Direct Run", idleGap: 0.9 }
+          },
+          {
+            id: "BG-088",
+            name: "BG. NUSANTARA 32",
+            tug: "TB. Mandiri 07",
+            spec: "GAR 4200 Low Ash",
+            volume: 8500,
+            targetHours: 6.29,
+            actualHours: 6.10,
+            loadingRate: 1393,
+            status: "Sesuai Target",
+            gantt: { startHour: 49.1, loadDuration: 6.1, delayDuration: 0, delayType: null, delayLabel: "Clean finish", idleGap: 1.0 }
+          }
+        ],
+        delays: [
+          { reason: "Heavy Rain (Wet Coal Stoppage)", hours: 7.2, type: "uncontrollable" },
+          { reason: "Conveyor Belt Tripping / Mechanical", hours: 6.1, type: "controllable" },
+          { reason: "Waiting for Tug Assistance / Mooring", hours: 4.8, type: "controllable" },
+          { reason: "Stacker Reclaimer Hopper Starvation", hours: 2.3, type: "controllable" },
+          { reason: "Draft Survey & Final Inspection Delay", hours: 1.8, type: "controllable" }
+        ]
+      }
+    };
+
+    let activeMonthKey = "2026-10";
+    let paretoChartInstance = null;
+
+    // Helper: format decimal hours into hours & minutes
+    function formatHours(hrs) {
+      const h = Math.floor(hrs);
+      const m = Math.round((hrs - h) * 60);
+      return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`;
+    }
+
+    // Switch Month and smoothly re-render everything
+    function switchMonth(monthKey) {
+      activeMonthKey = monthKey;
+      const data = monthlyDataStore[monthKey];
+      if (!data) return;
+
+      // Update Breadcrumb & Header
+      document.getElementById('breadcrumbPeriod').innerText = data.periodLabel;
+      document.getElementById('tableFilterTag').innerText = `${data.periodLabel} Fleet`;
+      document.getElementById('mergedRowsLabel').innerText = `Merged BASE + BASE2: ${data.barges.length} Barges`;
+
+      // 1. Update KPIs
+      document.getElementById('kpiTotalVolume').innerText = data.kpis.totalVolume;
+      document.getElementById('kpiLoadingRate').innerText = data.kpis.loadingRate;
+      document.getElementById('kpiIdleTime').innerText = data.kpis.idleTime;
+      document.getElementById('kpiProductivity').innerText = data.kpis.blcProductivity;
+
+      // 2. Update Speedometer Gauge
+      document.getElementById('gaugeCurrentVal').innerText = data.kpis.loadingRate;
+      document.getElementById('gaugeVariance').innerText = data.kpis.deltaText;
+      
+      const needle = document.getElementById('speedoNeedleGroup');
+      needle.style.transform = `rotate(${data.speedoAngle}deg)`;
+
+      const statusBadge = document.getElementById('gaugeStatusBadge');
+      if (data.kpis.isTargetMet) {
+        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold badge-system-green";
+        statusBadge.innerText = "Sesuai Target";
+        document.getElementById('gaugeVariance').className = "text-sm font-bold text-[#248A3D]";
+      } else {
+        statusBadge.className = "px-2.5 py-1 rounded-full text-xs font-semibold badge-system-red";
+        statusBadge.innerText = "Under Target";
+        document.getElementById('gaugeVariance').className = "text-sm font-bold text-[#D70015]";
+      }
+
+      // 3. Render Gantt Chart
+      renderGanttChart(data.barges);
+
+      // 4. Render Pareto Chart
+      renderParetoChart(data.delays);
+
+      // 5. Render Table
+      renderTable(data.barges);
+    }
+
+    // Render Gantt Timeline
+    function renderGanttChart(barges) {
+      const container = document.getElementById('ganttRowsContainer');
+      container.innerHTML = '';
+
+      // Total timeline horizon represents 48 hours for scaling percentage (100% = 48h)
+      const totalHorizonHours = 48;
+
+      barges.forEach((b, index) => {
+        const row = document.createElement('div');
+        row.className = "flex items-center text-xs group py-1.5 hover:bg-black/[0.02] rounded-xl px-2 transition-colors";
+
+        // Barge label column
+        const labelCol = document.createElement('div');
+        labelCol.className = "w-44 flex-shrink-0 pr-3";
+        labelCol.innerHTML = `
+          <div class="font-semibold text-[#1D1D1F] truncate">${b.name}</div>
+          <div class="text-[10px] text-[#86868B] flex items-center gap-1.5">
+            <span>${b.volume.toLocaleString()} MT</span>
+            <span>•</span>
+            <span class="${b.status === 'Sesuai Target' ? 'text-[#248A3D]' : 'text-[#D70015]'} font-medium">${b.status}</span>
+          </div>
+        `;
+
+        // Bar track container
+        const barTrack = document.createElement('div');
+        barTrack.className = "flex-1 relative h-8 bg-gray-100/70 rounded-xl overflow-hidden border border-black/[0.04]";
+
+        // Calculate positions in %
+        // To fit into the 48h view, modulate startHour slightly
+        const normalizedStart = (b.gantt.startHour % 40);
+        const startPct = Math.min(Math.max((normalizedStart / totalHorizonHours) * 100, 0), 85);
+        const loadPct = Math.min((b.gantt.loadDuration / totalHorizonHours) * 100, 35);
+        const delayPct = Math.min((b.gantt.delayDuration / totalHorizonHours) * 100, 20);
+
+        // Active Loading Bar (Blue)
+        const loadBar = document.createElement('div');
+        loadBar.className = "absolute top-1 bottom-1 bg-[#007AFF] text-white rounded-lg flex items-center px-2 text-[10px] font-medium shadow-sm transition-all hover:brightness-110 cursor-pointer overflow-hidden";
+        loadBar.style.left = `${startPct}%`;
+        loadBar.style.width = `${loadPct}%`;
+        loadBar.title = `${b.name}: Coal Loading (${b.gantt.loadDuration}h) - ${b.loadingRate} T/H`;
+        loadBar.innerHTML = `<span class="truncate">Loading ${b.gantt.loadDuration}h</span>`;
+
+        barTrack.appendChild(loadBar);
+
+        // Delay Bar (Red or Amber) if any
+        if (b.gantt.delayDuration > 0) {
+          const delayBar = document.createElement('div');
+          const isControllable = b.gantt.delayType === 'controllable';
+          delayBar.className = `absolute top-1 bottom-1 ${isControllable ? 'bg-[#FF3B30]' : 'bg-[#FF9500]'} text-white rounded-lg flex items-center px-2 text-[10px] font-medium shadow-sm transition-all hover:brightness-110 cursor-pointer overflow-hidden`;
+          delayBar.style.left = `${startPct + loadPct + 0.3}%`;
+          delayBar.style.width = `${Math.max(delayPct, 4)}%`;
+          delayBar.title = `Delay: ${b.gantt.delayLabel} (${b.gantt.delayDuration}h)`;
+          delayBar.innerHTML = `<span class="truncate">${b.gantt.delayLabel}</span>`;
+          barTrack.appendChild(delayBar);
+        }
+
+        // Idle space representation (visual dotted indicator after load)
+        const idleMark = document.createElement('div');
+        idleMark.className = "absolute top-2 bottom-2 border-r-2 border-dashed border-gray-400/50";
+        const idleLeft = startPct + loadPct + (b.gantt.delayDuration > 0 ? Math.max(delayPct, 4) : 0) + 0.5;
+        idleMark.style.left = `${Math.min(idleLeft + 2.5, 98)}%`;
+        idleMark.title = `Idle Gap: ${Math.round(b.gantt.idleGap * 60)} minutes`;
+        barTrack.appendChild(idleMark);
+
+        row.appendChild(labelCol);
+        row.appendChild(barTrack);
+        container.appendChild(row);
+      });
+    }
+
+    // Render Pareto Delay Chart
+    function renderParetoChart(delays) {
+      const ctx = document.getElementById('paretoChartCanvas').getContext('2d');
+      if (paretoChartInstance) {
+        paretoChartInstance.destroy();
+      }
+
+      // Sort delays descending
+      const sorted = [...delays].sort((a, b) => b.hours - a.hours);
+      const labels = sorted.map(d => d.reason);
+      const hours = sorted.map(d => d.hours);
+      
+      const totalHours = hours.reduce((acc, v) => acc + v, 0);
+      let cumulativeSum = 0;
+      const cumulativePercentages = hours.map(h => {
+        cumulativeSum += h;
+        return ((cumulativeSum / totalHours) * 100).toFixed(1);
+      });
+
+      // Update top 2 pct stat
+      const top2Sum = hours[0] + hours[1];
+      document.getElementById('topTwoDelayPct').innerText = `${((top2Sum / totalHours) * 100).toFixed(1)}%`;
+
+      // Apple palette colors
+      const backgroundColors = sorted.map(d => d.type === 'controllable' ? 'rgba(255, 59, 48, 0.85)' : 'rgba(255, 149, 0, 0.85)');
+
+      paretoChartInstance = new Chart(ctx, {
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Cumulative Impact %',
+              data: cumulativePercentages,
+              borderColor: '#007AFF',
+              borderWidth: 2.5,
+              pointBackgroundColor: '#FFFFFF',
+              pointBorderColor: '#007AFF',
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              yAxisID: 'yCumulative',
+              tension: 0.25,
+              order: 1
+            },
+            {
+              type: 'bar',
+              label: 'Lost Operational Hours',
+              data: hours,
+              backgroundColor: backgroundColors,
+              borderRadius: 8,
+              borderSkipped: false,
+              barThickness: 28,
+              yAxisID: 'yHours',
+              order: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'top',
+              align: 'end',
+              labels: {
+                boxWidth: 10,
+                boxHeight: 10,
+                usePointStyle: true,
+                pointStyle: 'circle',
+                font: { family: '-apple-system, Inter, sans-serif', size: 11, weight: '500' },
+                color: '#86868B'
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(29, 29, 31, 0.95)',
+              padding: 12,
+              cornerRadius: 12,
+              titleFont: { size: 12, weight: '600' },
+              bodyFont: { size: 11 },
+              callbacks: {
+                label: function(context) {
+                  if (context.dataset.type === 'line') {
+                    return ` Cumulative: ${context.parsed.y}% of total delays`;
+                  }
+                  return ` Duration: ${context.parsed.y} Hours lost`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: '#86868B',
+                font: { size: 10, weight: '500' },
+                callback: function(val, index) {
+                  const lbl = labels[index];
+                  return lbl.length > 18 ? lbl.substring(0, 18) + '...' : lbl;
+                }
+              }
+            },
+            yHours: {
+              type: 'linear',
+              position: 'left',
+              title: {
+                display: true,
+                text: 'Lost Hours',
+                color: '#86868B',
+                font: { size: 10, weight: '600' }
+              },
+              grid: { color: 'rgba(0, 0, 0, 0.04)' },
+              ticks: { color: '#86868B', font: { size: 10 } }
+            },
+            yCumulative: {
+              type: 'linear',
+              position: 'right',
+              min: 0,
+              max: 100,
+              title: {
+                display: true,
+                text: 'Cumulative %',
+                color: '#86868B',
+                font: { size: 10, weight: '600' }
+              },
+              grid: { display: false },
+              ticks: {
+                color: '#86868B',
+                font: { size: 10 },
+                callback: function(v) { return v + '%'; }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Render Minimalist Data Table
+    function renderTable(barges) {
+      const tbody = document.getElementById('bargeTableBody');
+      tbody.innerHTML = '';
+
+      barges.forEach((b) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-black/[0.015] transition-colors";
+
+        const isGood = b.status === "Sesuai Target";
+        const badgeClass = isGood ? "badge-system-green" : "badge-system-red";
+        const iconName = isGood ? "check" : "alert-triangle";
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-medium text-[#1D1D1F]">
+            <div class="font-semibold text-[13px]">${b.name}</div>
+            <div class="text-[11px] text-[#86868B]">${b.tug}</div>
+          </td>
+          <td class="py-3 px-4 text-[#48484A]">
+            <span class="px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-medium text-gray-700">${b.spec}</span>
+          </td>
+          <td class="py-3 px-4 text-right font-semibold text-[#1D1D1F]">
+            ${b.volume.toLocaleString()} <span class="text-[10px] text-[#86868B] font-normal">MT</span>
+          </td>
+          <td class="py-3 px-4 text-right text-[#48484A]">
+            ${formatHours(b.targetHours)}
+          </td>
+          <td class="py-3 px-4 text-right font-medium ${isGood ? 'text-[#1D1D1F]' : 'text-[#D70015] font-semibold'}">
+            ${formatHours(b.actualHours)}
+          </td>
+          <td class="py-3 px-4 text-right font-semibold ${b.loadingRate >= 1350 ? 'text-[#248A3D]' : 'text-[#D70015]'}">
+            ${b.loadingRate.toLocaleString()} <span class="text-[10px] text-[#86868B] font-normal">T/H</span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${badgeClass}">
+              <i data-lucide="${iconName}" class="w-3 h-3"></i>
+              ${b.status}
+            </span>
+          </td>
+          <td class="py-3 px-4 text-center">
+            <button onclick="viewBargeDetail('${b.id}')" class="px-2.5 py-1 text-xs text-[#007AFF] hover:bg-blue-50 rounded-lg transition-colors font-medium">
+              Inspect
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('tableEntriesSummary').innerText = `Showing ${barges.length} of ${barges.length} barges logged for this operational window`;
+      lucide.createIcons();
+    }
+
+    // Interactive filter for table search & status
+    function filterTable() {
+      const q = document.getElementById('bargeSearchInput').value.toLowerCase();
+      const statusFilter = document.getElementById('statusFilter').value;
+      const data = monthlyDataStore[activeMonthKey];
+
+      const filtered = data.barges.filter(b => {
+        const matchesQuery = b.name.toLowerCase().includes(q) || b.tug.toLowerCase().includes(q) || b.spec.toLowerCase().includes(q);
+        const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
+        return matchesQuery && matchesStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    // Modal popup inspect
+    function viewBargeDetail(bargeId) {
+      const data = monthlyDataStore[activeMonthKey];
+      const barge = data.barges.find(b => b.id === bargeId);
+      if (!barge) return;
+
+      document.getElementById('modalBargeName').innerText = barge.name;
+      document.getElementById('modalTugName').innerText = `Tug Assistance: ${barge.tug}`;
+      document.getElementById('modalVolume').innerText = `${barge.volume.toLocaleString()} MT`;
+      document.getElementById('modalRate').innerText = `${barge.loadingRate.toLocaleString()} Ton / Hour`;
+      document.getElementById('modalTarget').innerText = formatHours(barge.targetHours);
+      document.getElementById('modalActual').innerText = formatHours(barge.actualHours);
+
+      const auditEl = document.getElementById('modalAuditText');
+      if (barge.status === "Sesuai Target") {
+        auditEl.innerText = `BASE volume (${barge.volume} MT) matched load cell integration accurately. Conveyor maintained ${barge.loadingRate} T/H without exceeding thermal or mechanical envelope.`;
+      } else {
+        auditEl.innerText = `Delay registered: ${barge.gantt.delayLabel}. Actual duration overran target by ${(barge.actualHours - barge.targetHours).toFixed(2)} hours. Review equipment telemetry.`;
+      }
+
+      document.getElementById('bargeDetailModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      document.getElementById('bargeDetailModal').classList.add('hidden');
+    }
+
+    function exportReport() {
+      const data = monthlyDataStore[activeMonthKey];
+      alert(`Report generated for ${data.periodLabel}.\nTotal Volume: ${data.kpis.totalVolume} MT\nAverage BLC Rate: ${data.kpis.loadingRate} T/H\nStatus: ${data.kpis.blcProductivity} vs target.`);
+    }
+
+    function toggleParetoView() {
+      alert("Opening Root Cause Corrective Action (CAPA) logs for coal handling systems...");
+    }
+
+    // Initialize on window load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      switchMonth("2026-10");
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Port Command Center - Loading to Barge 2026",
+  "description": "Executive Dashboard & Decision Support System for Coal Port Loading to Barge Operations (2026), integrating real-time Google Spreadsheet telemetry (BASE, BASE2, Meeting Mentari).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
