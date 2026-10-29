@@ -39,8 +39,13 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
       .map((b) => ({
         label: `${b.bargeName} (#${b.noBarge})`,
         shortName: b.bargeName,
+        noBarge: b.noBarge,
         tugBoat: b.tugBoat,
         dateStr: b.dateStr,
+        inPositionStr: b.inPositionStr,
+        commencedLoadingStr: b.commencedLoadingStr,
+        completedLoadingStr: b.completedLoadingStr,
+        castOffStr: b.castOffStr,
         tonnage: b.tonnage,
         effectiveLoadingHours: b.effectiveLoadingHours,
         standbyHours: b.standbyHours,
@@ -133,6 +138,90 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
   const avgLostHours = Math.max(0, avgTat - avgEffectiveHours);
   const topBottleneck = paretoData[0];
 
+  // Custom Tooltip for Visualization 1 showing Tanggal Kejadian Pemuatan Tongkang
+  const renderTatTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="bg-[#061311]/95 border border-emerald-500/40 rounded-xl p-3.5 shadow-2xl text-xs text-slate-100 min-w-[270px] backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2 mb-2">
+          <div>
+            <div className="font-bold text-white text-sm">{d.label}</div>
+            <div className="text-[11px] text-slate-400">Tugboat: {d.tugBoat}</div>
+          </div>
+          <span className="px-2 py-1 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono-num font-bold">
+            {d.dateStr}
+          </span>
+        </div>
+        <div className="mb-2.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 space-y-0.5">
+          <div className="flex justify-between">
+            <span className="text-slate-400">Tanggal Kejadian Pemuatan:</span>
+            <strong className="font-mono-num text-emerald-300">{d.dateStr}</strong>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400">Mulai – Selesai Muat:</span>
+            <span className="font-mono-num text-slate-200">{d.commencedLoadingStr} s/d {d.completedLoadingStr}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400">Tonase Muat:</span>
+            <strong className="font-mono-num text-white">{d.tonnage.toLocaleString('id-ID')} MT</strong>
+          </div>
+        </div>
+        <div className="space-y-1">
+          {payload.map((entry: any, i: number) => (
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-xs inline-block" style={{ backgroundColor: entry.color }} />
+                {entry.name}:
+              </span>
+              <strong className="font-mono-num text-white">{Number(entry.value).toFixed(2)} Jam</strong>
+            </div>
+          ))}
+          <div className="pt-1.5 mt-1.5 border-t border-slate-800 flex items-center justify-between font-bold text-sky-300">
+            <span>Total Durasi Sandar (Gross TAT):</span>
+            <span className="font-mono-num">{d.totalTurnaroundHours.toFixed(2)} Jam</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Custom Tooltip for Visualization 2 showing Tanggal Kejadian Pemuatan Tongkang
+  const renderRateTooltip = ({ active, payload }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const d = payload[0].payload;
+    return (
+      <div className="bg-[#061311]/95 border border-emerald-500/40 rounded-xl p-3.5 shadow-2xl text-xs text-slate-100 min-w-[260px] backdrop-blur-md">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-2 mb-2">
+          <div>
+            <div className="font-bold text-white text-sm">{d.label}</div>
+            <div className="text-[11px] text-slate-400">Tonase: {d.tonnage.toLocaleString('id-ID')} MT</div>
+          </div>
+          <span className="px-2 py-1 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono-num font-bold">
+            {d.dateStr}
+          </span>
+        </div>
+        <div className="mb-2 px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] flex justify-between">
+          <span className="text-slate-400">Tanggal Kejadian Pemuatan:</span>
+          <strong className="font-mono-num text-emerald-300">{d.dateStr}</strong>
+        </div>
+        <div className="space-y-1">
+          {payload.map((entry: any, i: number) => (
+            <div key={i} className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-xs inline-block" style={{ backgroundColor: entry.color }} />
+                {entry.name}:
+              </span>
+              <strong className="font-mono-num text-white">
+                {Number(entry.value).toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} TPH
+              </strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header with Title and Subheader */}
@@ -145,72 +234,75 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
         </p>
       </div>
 
-      {/* 4 Summary Anatomy Metrics */}
+      {/* 4 Summary Anatomy Metrics with Distinct Vibrant Gradients */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-950/50 border border-white/15">
+          <div className="text-xs font-medium text-sky-100 flex items-center justify-between">
             <span>Rata-Rata Total Jam Sandar (Gross TAT)</span>
-            <Clock className="w-4 h-4 text-sky-400" />
+            <Clock className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-slate-50 mt-2">
-            {avgTat.toFixed(2)} <span className="text-xs font-normal text-slate-400">Jam / Barge</span>
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
+            {avgTat.toFixed(2)} <span className="text-xs font-normal text-sky-100">Jam / Barge</span>
           </div>
-          <div className="text-xs text-slate-400 mt-2">
-            Standar Target Perusahaan: <strong className="font-mono-num text-slate-200">8,22 – 8,78 Jam</strong>
+          <div className="text-xs text-sky-100/90 mt-2 pt-2 border-t border-white/15">
+            Standar Target Perusahaan: <strong className="font-mono-num text-white">8,22 – 8,78 Jam</strong>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-800 text-white shadow-lg shadow-emerald-950/50 border border-white/15">
+          <div className="text-xs font-medium text-emerald-100 flex items-center justify-between">
             <span>Effective Loading Hours (BLC Aktif)</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-emerald-400 mt-2">
-            {avgEffectiveHours.toFixed(2)} <span className="text-xs font-normal text-slate-400">Jam / Barge</span>
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
+            {avgEffectiveHours.toFixed(2)} <span className="text-xs font-normal text-emerald-100">Jam / Barge</span>
           </div>
-          <div className="text-xs text-slate-400 mt-2">
+          <div className="text-xs text-emerald-100/90 mt-2 pt-2 border-t border-white/15">
             Proporsi Jam Efektif:{' '}
-            <strong className="font-mono-num text-emerald-400">
+            <strong className="font-mono-num text-white">
               {avgTat > 0 ? ((avgEffectiveHours / avgTat) * 100).toFixed(1) : 0}%
             </strong>{' '}
             dari Total Sandar
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-amber-500 via-orange-500 to-amber-700 text-white shadow-lg shadow-amber-950/50 border border-white/15">
+          <div className="text-xs font-medium text-amber-100 flex items-center justify-between">
             <span>Rata-Rata Waktu Hilang (Idle + Delay)</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <AlertTriangle className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-amber-400 mt-2">
-            {avgLostHours.toFixed(2)} <span className="text-xs font-normal text-slate-400">Jam / Barge</span>
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
+            {avgLostHours.toFixed(2)} <span className="text-xs font-normal text-amber-100">Jam / Barge</span>
           </div>
-          <div className="text-xs text-slate-400 mt-2">
+          <div className="text-xs text-amber-100/90 mt-2 pt-2 border-t border-white/15">
             Standby + Breakdown + Weather Delay per siklus tongkang
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-rose-500/40 rounded-lg p-4">
-          <div className="text-xs text-rose-300 flex items-center justify-between font-medium">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-rose-500 via-pink-600 to-purple-800 text-white shadow-lg shadow-rose-950/50 border border-white/15">
+          <div className="text-xs font-medium text-rose-100 flex items-center justify-between">
             <span>Faktor Bottleneck #1 Pelabuhan (2026)</span>
-            <Wrench className="w-4 h-4 text-rose-400" />
+            <Wrench className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-sm font-bold text-slate-100 mt-2 line-clamp-1">
+          <div className="text-sm font-bold text-white mt-2 line-clamp-1">
             {topBottleneck ? topBottleneck.cause : '-'}
           </div>
-          <div className="text-xs text-rose-400 font-mono-num font-semibold mt-2">
+          <div className="text-xs text-rose-100 font-mono-num font-semibold mt-2 pt-2 border-t border-white/15">
             {topBottleneck ? `${topBottleneck.hours.toLocaleString('id-ID')} Jam (${topBottleneck.sharePct}% Total Delay)` : '-'}
           </div>
         </div>
       </div>
 
       {/* VISUALIZATION 1: Barge Turnaround Time (TAT) Breakdown (Horizontal Stacked Bar Chart) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+      <div className="bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 shadow-lg shadow-black/40">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
               Visualisasi 1: Barge Turnaround Time (TAT) Breakdown {sortedByWorstTat.length > 0 ? `(TOP ${sortedByWorstTat.length} Durasi Sandar Terlama)` : ''}
             </h3>
+            <p className="text-xs text-emerald-400/80 mt-0.5">
+              Arahkan kursor ke grafik batang untuk melihat tanggal kejadian pemuatan tongkang &amp; rincian durasi sandar.
+            </p>
           </div>
 
           {/* 4 Color Component Legend */}
@@ -252,6 +344,8 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                   stroke="#94A3B8"
                   fontSize={11}
                   unit=" Jam"
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   type="category"
@@ -259,19 +353,12 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                   stroke="#CBD5E1"
                   fontSize={11}
                   width={175}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    color: '#F8FAFC',
-                  }}
-                  formatter={(value: any, name: any) => [
-                    typeof value === 'number' ? `${value.toFixed(2)} Jam` : String(value ?? '-'),
-                    String(name),
-                  ]}
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
+                  content={renderTatTooltip}
                 />
                 <ReferenceLine
                   x={8.5}
@@ -294,21 +381,21 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                 />
                 <Bar
                   dataKey="standbyHours"
-                  name="Operational Standby / Idle (Draft, Shifting, Tunggu Stockpile)"
+                  name="Operational Standby / Idle"
                   stackId="tat"
                   fill="#EAB308"
                   barSize={20}
                 />
                 <Bar
                   dataKey="breakdownHours"
-                  name="Equipment Breakdown (BLC, Loader, Dozer)"
+                  name="Equipment Breakdown"
                   stackId="tat"
                   fill="#EF4444"
                   barSize={20}
                 />
                 <Bar
                   dataKey="weatherExternalHours"
-                  name="External / Weather Delay (Hujan, Pasang Surut/Tidal)"
+                  name="External / Weather Delay"
                   stackId="tat"
                   fill="#3B82F6"
                   radius={[0, 4, 4, 0]}
@@ -323,13 +410,13 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
       {/* ROW 2: VISUALIZATION 2 (Gross vs Effective Rate) & VISUALIZATION 3 (Pareto Bottleneck Pelabuhan) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* VISUALIZATION 2: Gross vs Effective Loading Rate per Barge vs 1.350 TPH */}
-        <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
               Visualisasi 2: Gross vs Effective Loading Rate per Barge vs Target 1.350 TPH
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Menunjukkan seberapa besar kecepatan muat tergerus oleh waktu tunggu sandar (Gross Rate vs Effective BLC Rate).
+              Menunjukkan seberapa besar kecepatan muat tergerus oleh waktu tunggu sandar (arahkan kursor untuk melihat tanggal pemuatan).
             </p>
           </div>
 
@@ -339,7 +426,21 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                 data={sortedByWorstTat}
                 margin={{ top: 15, right: 15, left: 0, bottom: 45 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <defs>
+                  <linearGradient id="effGreenBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34D399" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.35} />
+                  </linearGradient>
+                  <linearGradient id="effRedBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#F87171" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#DC2626" stopOpacity={0.35} />
+                  </linearGradient>
+                  <linearGradient id="grossSlateBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#94A3B8" stopOpacity={0.85} />
+                    <stop offset="100%" stopColor="#475569" stopOpacity={0.35} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                 <XAxis
                   dataKey="shortName"
                   stroke="#94A3B8"
@@ -347,16 +448,13 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                   angle={-25}
                   textAnchor="end"
                   interval={0}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 1850]} unit=" TPH" />
+                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 1850]} unit=" TPH" axisLine={false} tickLine={false} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                    color: '#F8FAFC',
-                  }}
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
+                  content={renderRateTooltip}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px' }} />
                 <ReferenceLine
@@ -374,21 +472,21 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                 <Bar
                   dataKey="grossRateTph"
                   name="Gross Loading Rate (TPH)"
-                  fill="#64748B"
-                  radius={[3, 3, 0, 0]}
+                  fill="url(#grossSlateBar)"
+                  radius={[4, 4, 0, 0]}
                   barSize={18}
                 />
                 <Bar
                   dataKey="effectiveRateTph"
                   name="Effective BLC Rate (TPH)"
-                  fill="#10B981"
-                  radius={[3, 3, 0, 0]}
+                  fill="url(#effGreenBar)"
+                  radius={[4, 4, 0, 0]}
                   barSize={18}
                 >
                   {sortedByWorstTat.map((entry, idx) => (
                     <Cell
                       key={`eff-${idx}`}
-                      fill={entry.effectiveRateTph >= 1350 ? '#10B981' : '#EF4444'}
+                      fill={entry.effectiveRateTph >= 1350 ? 'url(#effGreenBar)' : 'url(#effRedBar)'}
                     />
                   ))}
                 </Bar>
@@ -398,7 +496,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
         </div>
 
         {/* VISUALIZATION 3: Pareto Bottleneck Pelabuhan (Ranking Penyebab Hilangnya Waktu 2026) */}
-        <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col justify-between">
+        <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
               Visualisasi 3: Pareto Bottleneck Pelabuhan 2026 (Sheet BASE &amp; BASE2)
@@ -414,32 +512,37 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                 data={paretoData}
                 margin={{ top: 10, right: 15, left: 0, bottom: 25 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                 <XAxis
                   dataKey="cause"
                   stroke="#94A3B8"
                   fontSize={10}
                   tickFormatter={(v: string) => (v.length > 16 ? `${v.slice(0, 16)}…` : v)}
+                  axisLine={false}
+                  tickLine={false}
                 />
-                <YAxis yAxisId="left" stroke="#94A3B8" fontSize={11} unit=" Jam" />
+                <YAxis yAxisId="left" stroke="#94A3B8" fontSize={11} unit=" Jam" axisLine={false} tickLine={false} />
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  stroke="#38BDF8"
+                  stroke="#34D399"
                   fontSize={11}
                   domain={[0, 100]}
                   unit="%"
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
                   contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
+                    backgroundColor: '#061311',
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                    borderRadius: '10px',
                     fontSize: '12px',
                     color: '#F8FAFC',
                   }}
                 />
-                <Bar yAxisId="left" dataKey="hours" name="Total Jam Hilang (Hours)" barSize={28} radius={[4, 4, 0, 0]}>
+                <Bar yAxisId="left" dataKey="hours" name="Total Jam Hilang (Hours)" barSize={28} radius={[6, 6, 0, 0]}>
                   {paretoData.map((entry, idx) => (
                     <Cell key={`pcell-${idx}`} fill={entry.color} />
                   ))}
@@ -449,9 +552,9 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                   type="monotone"
                   dataKey="cumulativePct"
                   name="Kumulatif (%)"
-                  stroke="#38BDF8"
+                  stroke="#34D399"
                   strokeWidth={2.5}
-                  dot={{ r: 4, fill: '#38BDF8' }}
+                  dot={{ r: 4, fill: '#10B981', stroke: '#A7F3D0', strokeWidth: 1.5 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
@@ -462,7 +565,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
             {paretoData.slice(0, 4).map((item) => (
               <div
                 key={item.rank}
-                className="flex items-center justify-between text-xs py-1.5 px-3 bg-slate-950 border border-slate-800/80 rounded"
+                className="flex items-center justify-between text-xs py-1.5 px-3 bg-slate-950/80 border border-slate-800/80 rounded-lg"
               >
                 <div className="flex items-center gap-2 truncate pr-2">
                   <span className="font-mono-num font-bold text-slate-400">#{item.rank}</span>
@@ -474,7 +577,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
                 </div>
                 <div className="flex items-center gap-3 shrink-0 font-mono-num">
                   <span className="text-slate-100 font-bold">{item.hours.toLocaleString('id-ID')} Jam</span>
-                  <span className="text-sky-400 w-12 text-right">{item.sharePct}%</span>
+                  <span className="text-emerald-400 w-12 text-right">{item.sharePct}%</span>
                 </div>
               </div>
             ))}

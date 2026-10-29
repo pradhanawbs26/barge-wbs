@@ -210,22 +210,22 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
         </div>
       </div>
 
-      {/* 4 Efficiency KPI Strip */}
+      {/* 4 Efficiency KPI Strip with Distinct Vibrant Gradients */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-950/50 border border-white/15">
+          <div className="text-xs font-medium text-sky-100 flex items-center justify-between">
             <span>Avg Fuel Ratio Loading to Barge</span>
-            <Fuel className="w-4 h-4 text-sky-400" />
+            <Fuel className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-slate-50 mt-2">
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
             {avgLoadingFuelActual.toFixed(2)}{' '}
-            <span className="text-xs font-normal text-slate-400">Index L/KT ( ~0,031 L/Ton )</span>
+            <span className="text-xs font-normal text-sky-100">Index L/KT</span>
           </div>
-          <div className="text-xs mt-2 flex items-center justify-between">
-            <span className="text-slate-400">Plan Baku: 33,68</span>
+          <div className="text-xs mt-2 pt-2 border-t border-white/15 flex items-center justify-between">
+            <span className="text-sky-100">Plan Baku: 33,68</span>
             <span
-              className={`font-mono-num font-semibold ${
-                avgLoadingFuelActual <= 33.68 ? 'text-emerald-400' : 'text-rose-400'
+              className={`font-mono-num font-bold px-2 py-0.5 rounded bg-black/25 ${
+                avgLoadingFuelActual <= 33.68 ? 'text-emerald-300' : 'text-rose-200'
               }`}
             >
               {avgLoadingFuelActual <= 33.68 ? 'Efisien (-' : 'Boros (+'}
@@ -234,20 +234,20 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-800 text-white shadow-lg shadow-emerald-950/50 border border-white/15">
+          <div className="text-xs font-medium text-emerald-100 flex items-center justify-between">
             <span>Avg HM Ratio Loading to Barge</span>
-            <Timer className="w-4 h-4 text-emerald-400" />
+            <Timer className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-slate-50 mt-2">
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
             {avgLoadingHmActual.toFixed(2)}{' '}
-            <span className="text-xs font-normal text-slate-400">HM Index ( ~0,0026 HM/Ton )</span>
+            <span className="text-xs font-normal text-emerald-100">HM Index</span>
           </div>
-          <div className="text-xs mt-2 flex items-center justify-between">
-            <span className="text-slate-400">Plan Baku: 2,89</span>
+          <div className="text-xs mt-2 pt-2 border-t border-white/15 flex items-center justify-between">
+            <span className="text-emerald-100">Plan Baku: 2,89</span>
             <span
-              className={`font-mono-num font-semibold ${
-                avgLoadingHmActual <= 2.89 ? 'text-emerald-400' : 'text-rose-400'
+              className={`font-mono-num font-bold px-2 py-0.5 rounded bg-black/25 ${
+                avgLoadingHmActual <= 2.89 ? 'text-white' : 'text-rose-200'
               }`}
             >
               {avgLoadingHmActual <= 2.89 ? 'Optimal (-' : 'Over HM (+'}
@@ -256,31 +256,31 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-amber-500 via-orange-500 to-amber-700 text-white shadow-lg shadow-amber-950/50 border border-white/15">
+          <div className="text-xs font-medium text-amber-100 flex items-center justify-between">
             <span>Deteksi Hari Anomali (Idle Running)</span>
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            <AlertTriangle className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-amber-400 mt-2">
-            {anomalyDays.length} <span className="text-xs font-normal text-slate-400">Hari Terdeteksi</span>
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
+            {anomalyDays.length} <span className="text-xs font-normal text-amber-100">Hari Terdeteksi</span>
           </div>
-          <div className="text-xs text-slate-400 mt-2">
+          <div className="text-xs text-amber-100/90 mt-2 pt-2 border-t border-white/15">
             Kondisi HM &amp; BBM tinggi namun tonase muat tongkang rendah
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
+        <div className="relative overflow-hidden rounded-xl p-5 bg-gradient-to-br from-purple-600 via-indigo-600 to-slate-800 text-white shadow-lg shadow-indigo-950/50 border border-white/15">
+          <div className="text-xs font-medium text-indigo-100 flex items-center justify-between">
             <span>Porsi Loading to Barge vs Total Operasi</span>
-            <Layers className="w-4 h-4 text-sky-400" />
+            <Layers className="w-5 h-5 text-white/80" />
           </div>
-          <div className="text-2xl font-bold font-mono-num text-sky-400 mt-2">
+          <div className="text-2xl font-extrabold font-mono-num text-white mt-2">
             {loadingFocusItem ? loadingFocusItem.fuelSharePct : 7.8}%{' '}
-            <span className="text-xs font-normal text-slate-400">Total BBM Pelabuhan</span>
+            <span className="text-xs font-normal text-indigo-100">Total BBM Pelabuhan</span>
           </div>
-          <div className="text-xs text-slate-400 mt-2">
+          <div className="text-xs text-indigo-100/90 mt-2 pt-2 border-t border-white/15">
             Kontribusi HM Alat:{' '}
-            <strong className="font-mono-num text-slate-200">
+            <strong className="font-mono-num text-white">
               {loadingFocusItem ? loadingFocusItem.hmSharePct : 5.4}%
             </strong>{' '}
             dari 5 Aktivitas
@@ -288,14 +288,14 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
         </div>
       </div>
 
-      {/* ROW 1 CHARTS: a) Tren Fuel Ratio & b) Tren HM Ratio Loading to Barge */}
+      {/* ROW 1 CHARTS: Tren Fuel Ratio & Tren HM Ratio Loading to Barge */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart A: Tren Fuel Ratio Loading to Barge */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+        <div className="bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 shadow-lg shadow-black/40">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-100">
-                a) Tren Fuel Ratio &ldquo;Loading to Barge&rdquo; ({granularity})
+                Tren Fuel Ratio &ldquo;Loading to Barge&rdquo; ({granularity})
               </h3>
               <p className="text-xs text-slate-400">
                 Konsumsi BBM spesifik aktivitas pemuatan tongkang terhadap batas Plan (33,68)
@@ -306,14 +306,25 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={aggregatedSeries} margin={{ top: 10, right: 15, left: 0, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} />
-                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 45]} />
+                <defs>
+                  <linearGradient id="fuelEmeraldBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#34D399" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.35} />
+                  </linearGradient>
+                  <linearGradient id="fuelRoseBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#F87171" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#DC2626" stopOpacity={0.35} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 45]} axisLine={false} tickLine={false} />
                 <Tooltip
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
                   contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
+                    backgroundColor: '#061311',
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                    borderRadius: '10px',
                     fontSize: '12px',
                     color: '#F8FAFC',
                   }}
@@ -331,11 +342,11 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                     fontSize: 11,
                   }}
                 />
-                <Bar dataKey="fuelActual" name="Actual Fuel Ratio (Loading to Barge)" barSize={20} radius={[3, 3, 0, 0]}>
+                <Bar dataKey="fuelActual" name="Actual Fuel Ratio (Loading to Barge)" barSize={20} radius={[4, 4, 0, 0]}>
                   {aggregatedSeries.map((entry, idx) => (
                     <Cell
                       key={`fcell-${idx}`}
-                      fill={entry.fuelActual <= entry.fuelPlan ? '#0EA5E9' : '#EF4444'}
+                      fill={entry.fuelActual <= entry.fuelPlan ? 'url(#fuelEmeraldBar)' : 'url(#fuelRoseBar)'}
                     />
                   ))}
                 </Bar>
@@ -353,11 +364,11 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
         </div>
 
         {/* Chart B: Tren HM Ratio Loading to Barge */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+        <div className="bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 shadow-lg shadow-black/40">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-bold text-slate-100">
-                b) Tren HM Ratio &ldquo;Loading to Barge&rdquo; ({granularity})
+                Tren HM Ratio &ldquo;Loading to Barge&rdquo; ({granularity})
               </h3>
               <p className="text-xs text-slate-400">
                 Rasio Hour Meter (HM) alat muat &amp; support terhadap tonase muat (Target Plan: 2,89)
@@ -368,14 +379,25 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={aggregatedSeries} margin={{ top: 10, right: 15, left: 0, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
-                <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} />
-                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 4.2]} />
+                <defs>
+                  <linearGradient id="hmEmeraldBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#047857" stopOpacity={0.35} />
+                  </linearGradient>
+                  <linearGradient id="hmAmberBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#FBBF24" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#D97706" stopOpacity={0.35} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+                <XAxis dataKey="label" stroke="#94A3B8" fontSize={10} axisLine={false} tickLine={false} />
+                <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 4.2]} axisLine={false} tickLine={false} />
                 <Tooltip
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
                   contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
+                    backgroundColor: '#061311',
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                    borderRadius: '10px',
                     fontSize: '12px',
                     color: '#F8FAFC',
                   }}
@@ -383,7 +405,7 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
                 <ReferenceLine
                   y={2.89}
-                  stroke="#10B981"
+                  stroke="#34D399"
                   strokeDasharray="4 4"
                   strokeWidth={2}
                   label={{
@@ -393,11 +415,11 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                     fontSize: 11,
                   }}
                 />
-                <Bar dataKey="hmActual" name="Actual HM Ratio (Loading to Barge)" barSize={20} radius={[3, 3, 0, 0]}>
+                <Bar dataKey="hmActual" name="Actual HM Ratio (Loading to Barge)" barSize={20} radius={[4, 4, 0, 0]}>
                   {aggregatedSeries.map((entry, idx) => (
                     <Cell
                       key={`hmcell-${idx}`}
-                      fill={entry.hmActual <= entry.hmPlan ? '#10B981' : '#F59E0B'}
+                      fill={entry.hmActual <= entry.hmPlan ? 'url(#hmEmeraldBar)' : 'url(#hmAmberBar)'}
                     />
                   ))}
                 </Bar>
@@ -405,7 +427,7 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                   type="monotone"
                   dataKey="hmPlan"
                   name="Plan HM Target"
-                  stroke="#10B981"
+                  stroke="#34D399"
                   strokeWidth={2}
                   dot={false}
                 />
@@ -415,13 +437,13 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
         </div>
       </div>
 
-      {/* ROW 2: c) Combo / Anomaly Chart (Tonase vs BBM & HM) & d) Kontribusi Terhadap Total Operation */}
+      {/* ROW 2: Combo / Anomaly Chart (Tonase vs BBM & HM) & Kontribusi Terhadap Total Operation */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Chart C: Tonase Muat vs Konsumsi BBM & Jam Alat (Deteksi Idle Running) */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col justify-between">
+        <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
-              c) Deteksi Anomali: Tonase Muat Tongkang vs Konsumsi BBM (Fuel) &amp; Jam Alat (HM)
+              Deteksi Anomali: Tonase Muat Tongkang vs Konsumsi BBM (Fuel) &amp; Jam Alat (HM)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Menyandingkan volume muat harian dengan rasio BBM &amp; HM untuk menangkap insiden <em>idle running</em> (mesin menyala namun muatan tersendat).
@@ -431,31 +453,44 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
           <div className="h-72 w-full mt-4">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={efficiencyRecords} margin={{ top: 10, right: 15, left: 5, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <defs>
+                  <linearGradient id="tonCyanBar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.55} />
+                    <stop offset="100%" stopColor="#064E3B" stopOpacity={0.15} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                 <XAxis
                   dataKey="dateStr"
                   stroke="#94A3B8"
                   fontSize={10}
                   tickFormatter={(v: string) => v.replace('-2026', '')}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   yAxisId="ton"
                   stroke="#94A3B8"
                   fontSize={11}
                   unit=" T"
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <YAxis
                   yAxisId="ratio"
                   orientation="right"
-                  stroke="#F59E0B"
+                  stroke="#34D399"
                   fontSize={11}
                   domain={[0, 45]}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
+                  cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
                   contentStyle={{
-                    backgroundColor: '#0F172A',
-                    borderColor: '#334155',
-                    borderRadius: '8px',
+                    backgroundColor: '#061311',
+                    borderColor: 'rgba(16, 185, 129, 0.35)',
+                    borderRadius: '10px',
                     fontSize: '12px',
                     color: '#F8FAFC',
                   }}
@@ -465,9 +500,10 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                   yAxisId="ton"
                   dataKey="tonnageLoaded"
                   name="Tonase Muat ke Tongkang (MT)"
-                  fill="#1E293B"
-                  stroke="#38BDF8"
+                  fill="url(#tonCyanBar)"
+                  stroke="#10B981"
                   strokeWidth={1}
+                  radius={[4, 4, 0, 0]}
                   barSize={18}
                 />
                 <Line
@@ -475,25 +511,25 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                   type="monotone"
                   dataKey="loadingFuelRatioActual"
                   name="Fuel Ratio Loading to Barge"
-                  stroke="#EF4444"
+                  stroke="#34D399"
                   strokeWidth={2.5}
-                  dot={{ r: 3 }}
+                  dot={{ r: 3.5, fill: '#10B981' }}
                 />
                 <Line
                   yAxisId="ratio"
                   type="monotone"
                   dataKey="loadingHmRatioActual"
                   name="HM Ratio Loading to Barge"
-                  stroke="#F59E0B"
+                  stroke="#FBBF24"
                   strokeWidth={2}
-                  dot={{ r: 3 }}
+                  dot={{ r: 3, fill: '#F59E0B' }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
 
           {anomalyDays.length > 0 && (
-            <div className="mt-3 p-3 bg-slate-950 border border-rose-500/30 rounded text-xs text-slate-300 flex items-start gap-2.5">
+            <div className="mt-3 p-3 bg-slate-950/80 border border-rose-500/30 rounded-lg text-xs text-slate-300 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold text-rose-400">Temuan Anomali Idle Running: </span>
@@ -504,10 +540,10 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
         </div>
 
         {/* Chart D: Perbandingan Kontribusi Loading to Barge terhadap Total Operation (5 Aktivitas) */}
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
-              d) Kontribusi &ldquo;Loading to Barge&rdquo; vs Total Operation
+              Kontribusi &ldquo;Loading to Barge&rdquo; vs Total Operation
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Perbandingan Fuel Ratio &amp; HM Ratio di 5 aktivitas utama (Unloading CY, Coal Hauling, Stockpile, Moving Cargo, Loading to Barge).
@@ -520,12 +556,12 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                 key={item.activity}
                 className={`p-3 rounded-lg border text-xs ${
                   item.isFocus
-                    ? 'bg-sky-950/30 border-sky-500/50'
-                    : 'bg-slate-950 border-slate-800/80'
+                    ? 'bg-emerald-950/30 border-emerald-500/50'
+                    : 'bg-slate-950/80 border-slate-800/80'
                 }`}
               >
                 <div className="flex items-center justify-between font-semibold">
-                  <span className={item.isFocus ? 'text-sky-300 font-bold' : 'text-slate-200'}>
+                  <span className={item.isFocus ? 'text-emerald-300 font-bold' : 'text-slate-200'}>
                     {item.activity}
                   </span>
                   <span className="font-mono-num text-slate-300">
@@ -535,7 +571,7 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
                 </div>
                 <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-2 flex">
                   <div
-                    className={item.isFocus ? 'bg-sky-400 h-full' : 'bg-slate-500 h-full'}
+                    className={item.isFocus ? 'bg-emerald-400 h-full' : 'bg-slate-500 h-full'}
                     style={{ width: `${Math.min(100, Math.max(4, item.fuelSharePct))}%` }}
                   />
                 </div>
@@ -543,8 +579,8 @@ export const EquipmentEfficiencyView: React.FC<EquipmentEfficiencyViewProps> = (
             ))}
           </div>
 
-          <div className="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-400">
-            Meskipun <strong className="text-slate-200">Coal Hauling</strong> menyerap porsi BBM terbesar secara total, efisiensi <strong className="text-sky-400">Loading to Barge</strong> sangat krusial karena menentukan kecepatan pelepasan tongkang (demurrage control).
+          <div className="mt-3 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
+            Meskipun <strong className="text-slate-200">Coal Hauling</strong> menyerap porsi BBM terbesar secara total, efisiensi <strong className="text-emerald-400">Loading to Barge</strong> sangat krusial karena menentukan kecepatan pelepasan tongkang (demurrage control).
           </div>
         </div>
       </div>

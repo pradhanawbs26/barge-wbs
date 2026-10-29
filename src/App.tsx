@@ -307,122 +307,135 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    document.title = 'DASHBOARD LOADING BARGE PT. WBS';
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#0B1120] text-slate-100 flex flex-col">
-      {/* STRICT 3-ZONE TOP BAR CONTRACT */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-950 border-b border-slate-800 sticky top-0 z-30">
-        {/* Zone 1: Single text element wordmark with subheader */}
-        <div className="flex flex-col shrink-0">
-          <a
-            href="#top"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveTab('MORNING_MEETING');
-            }}
-            className="text-base font-extrabold tracking-tight text-slate-50 whitespace-nowrap leading-tight"
-          >
-            DASHBOARD BARGE PERFORMANCE
-          </a>
-          <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase">
-            PT. WAHANA BARA SENTOSA
-          </span>
-        </div>
-
-        {/* Zone 2: 4 concise single-line text navigation links */}
-        <nav className="hidden xl:flex items-center gap-6 text-xs font-semibold text-slate-400">
-          <button
-            onClick={() => setActiveTab('MORNING_MEETING')}
-            className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-              activeTab === 'MORNING_MEETING'
-                ? 'text-sky-400 border-sky-400'
-                : 'border-transparent hover:text-slate-100'
-            }`}
-          >
-            01. Summary
-          </button>
-          <button
-            onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
-            className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-              activeTab === 'TURNAROUND_ANATOMY'
-                ? 'text-sky-400 border-sky-400'
-                : 'border-transparent hover:text-slate-100'
-            }`}
-          >
-            02. Turnaround &amp; Delay Anatomy
-          </button>
-          <button
-            onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
-            className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-              activeTab === 'EQUIPMENT_EFFICIENCY'
-                ? 'text-sky-400 border-sky-400'
-                : 'border-transparent hover:text-slate-100'
-            }`}
-          >
-            03. Equipment &amp; Fuel Efficiency
-          </button>
-          <button
-            onClick={() => setActiveTab('DATA_EXPLORER')}
-            className={`py-1 transition-colors whitespace-nowrap shrink-0 border-b-2 ${
-              activeTab === 'DATA_EXPLORER'
-                ? 'text-sky-400 border-sky-400'
-                : 'border-transparent hover:text-slate-100'
-            }`}
-          >
-            04. Data Explorer &amp; Insights
-          </button>
-        </nav>
-
-        {/* Zone 3: 1 primary action button */}
-        <div className="flex items-center shrink-0">
-          <button
-            onClick={() => setIsConfigOpen(true)}
-            className="px-3.5 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2"
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Konfigurasi Sumber Data / Sync Sheet</span>
-          </button>
-        </div>
-      </header>
-
-      {/* WORKSPACETOOLBAR: Mobile/Tablet Menu Switcher + Global 2026 Operational Filter Bar */}
-      <div className="bg-slate-900/90 border-b border-slate-800 px-6 py-3">
-        <div className="max-w-[1440px] mx-auto flex flex-col gap-3">
-          {/* Responsive Tab Bar for smaller screens + Live Sheet Status summary */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex xl:hidden items-center gap-1.5 overflow-x-auto pb-1">
-              <button
-                onClick={() => setActiveTab('MORNING_MEETING')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shrink-0 ${
-                  activeTab === 'MORNING_MEETING' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400'
-                }`}
+    <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col">
+      {/* STICKY / FREEZE HEADER + NAVIGATION & FILTER BAR */}
+      <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md shadow-xl shadow-black/50 border-b border-slate-800">
+        {/* TOP HEADER BAR */}
+        <header className="flex items-center justify-between gap-4 px-6 py-3 border-b border-slate-800/80">
+          {/* Zone 1: Logo + Brand Title with Subheader */}
+          <div className="flex items-center gap-3 shrink-0">
+            <img
+              src="https://res.cloudinary.com/dgjnlxf69/image/upload/v1793234716/Logo_WBS_BLC_mltbxd.png"
+              alt="Logo WBS BLC"
+              className="h-10 w-auto object-contain rounded-lg bg-slate-900/90 p-1 border border-slate-700/80 shadow-md"
+            />
+            <div className="flex flex-col">
+              <a
+                href="#top"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveTab('MORNING_MEETING');
+                }}
+                className="text-lg font-extrabold tracking-tight text-slate-50 whitespace-nowrap leading-tight"
               >
-                01. Summary
-              </button>
-              <button
-                onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shrink-0 ${
-                  activeTab === 'TURNAROUND_ANATOMY' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400'
-                }`}
-              >
-                02. Turnaround &amp; Delay
-              </button>
-              <button
-                onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shrink-0 ${
-                  activeTab === 'EQUIPMENT_EFFICIENCY' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400'
-                }`}
-              >
-                03. Fuel &amp; HM Ratio
-              </button>
-              <button
-                onClick={() => setActiveTab('DATA_EXPLORER')}
-                className={`px-3 py-1.5 rounded text-xs font-semibold whitespace-nowrap shrink-0 ${
-                  activeTab === 'DATA_EXPLORER' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400'
-                }`}
-              >
-                04. Data Explorer
-              </button>
+                DASHBOARD LOADING BARGE
+              </a>
+              <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase mt-0.5">
+                PT. WAHANA BARA SENTOSA
+              </span>
             </div>
+          </div>
+
+          {/* Zone 2: 4 Navigation Links (Desktop) */}
+          <nav className="hidden xl:flex items-center gap-2 text-xs font-semibold">
+            <button
+              onClick={() => setActiveTab('MORNING_MEETING')}
+              className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'MORNING_MEETING'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/50'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+              }`}
+            >
+              01. Summary
+            </button>
+            <button
+              onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
+              className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'TURNAROUND_ANATOMY'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/50'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+              }`}
+            >
+              02. Turnaround &amp; Delay
+            </button>
+            <button
+              onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
+              className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'EQUIPMENT_EFFICIENCY'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/50'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+              }`}
+            >
+              03. Fuel &amp; HM Ratio
+            </button>
+            <button
+              onClick={() => setActiveTab('DATA_EXPLORER')}
+              className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'DATA_EXPLORER'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/50'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+              }`}
+            >
+              04. Data Explorer
+            </button>
+          </nav>
+
+          {/* Zone 3: Sync Data Action Button */}
+          <div className="flex items-center justify-end gap-3 shrink-0 ml-auto">
+            <button
+              onClick={() => setIsConfigOpen(true)}
+              className="px-3.5 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 rounded-lg transition-colors whitespace-nowrap shrink-0 flex items-center gap-2 shadow-sm"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Sync Data</span>
+            </button>
+          </div>
+        </header>
+
+        {/* FROZEN WORKSPACE TOOLBAR: Menu Switcher + Global 2026 Operational Filter Bar */}
+        <div className="bg-slate-900/95 px-6 py-2.5">
+          <div className="max-w-[1440px] mx-auto flex flex-col gap-2.5">
+            {/* Responsive Tab Bar for smaller/tablet screens + Global Filters */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex xl:hidden items-center gap-1.5 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setActiveTab('MORNING_MEETING')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    activeTab === 'MORNING_MEETING' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  01. Summary
+                </button>
+                <button
+                  onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    activeTab === 'TURNAROUND_ANATOMY' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  02. Turnaround &amp; Delay
+                </button>
+                <button
+                  onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    activeTab === 'EQUIPMENT_EFFICIENCY' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  03. Fuel &amp; HM Ratio
+                </button>
+                <button
+                  onClick={() => setActiveTab('DATA_EXPLORER')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    activeTab === 'DATA_EXPLORER' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  04. Data Explorer
+                </button>
+              </div>
 
             {/* Global Filter Controls: Periode, Bulan 2026, Rentang Tanggal, Nama Tongkang */}
             <div className="flex flex-wrap items-center gap-2.5 text-xs w-full xl:w-auto justify-between xl:justify-start">
@@ -527,6 +540,7 @@ export default function App() {
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* MAIN VIEWPORT CONTENT */}
