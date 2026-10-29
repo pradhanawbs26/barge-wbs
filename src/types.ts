@@ -29,6 +29,7 @@ export interface ColumnMapping {
     waitingSurveyorInit: number;
     initialDraft: number;
     movingCargo: number;
+    tambahanCargo: number;
     collectingCargo: number;
     prepareLoading: number;
     loadingToBarge: number;
@@ -41,6 +42,7 @@ export interface ColumnMapping {
     waitingSurveyorFinal: number;
     finalDraft: number;
     externalProblem: number;
+    finalDraft2: number;
     waitingTugboat: number;
     castOff: number;
     remark: number;

@@ -39,6 +39,7 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
     waitingSurveyorInit: 8,
     initialDraft: 9,
     movingCargo: 10,
+    tambahanCargo: 11,
     collectingCargo: 12,
     prepareLoading: 13,
     loadingToBarge: 14,
@@ -51,6 +52,7 @@ export const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
     waitingSurveyorFinal: 21,
     finalDraft: 22,
     externalProblem: 23,
+    finalDraft2: 24,
     waitingTugboat: 25,
     castOff: 26,
     remark: 27,
@@ -277,14 +279,15 @@ export function processBaseAndBase2(
     const tonPerRit = parseIndoNumber(r[15]) || (ritase > 0 ? tonnage / ritase : 18.5);
 
     let grossHours = parseIndoNumber(r[bm.grossDuration]);
-    let effectiveLoadingHours = parseIndoNumber(r[bm.netDuration]);
+    const netDurationFromBase = parseIndoNumber(r[bm.netDuration]);
+    let effectiveLoadingHours = netDurationFromBase;
 
     // Sanitize negative or corrupted formula durations from spreadsheet
-    if (effectiveLoadingHours <= 0.5 || effectiveLoadingHours > 120) {
+    if (effectiveLoadingHours <= 0.5 || effectiveLoadingHours > 30) {
       const grossPdty = parseIndoNumber(r[bm.grossPdty]);
       effectiveLoadingHours = grossPdty > 200 ? tonnage / grossPdty : tonnage / 1365;
     }
-    if (grossHours <= 0.5 || grossHours > 150 || grossHours < effectiveLoadingHours) {
+    if (grossHours <= 0.5 || grossHours > 48 || grossHours < effectiveLoadingHours) {
       grossHours = effectiveLoadingHours + 2.15;
     }
 
@@ -299,35 +302,97 @@ export function processBaseAndBase2(
     let b2LoadingHours = 0;
     const remarks: string[] = [];
 
+    let prevStartStr = '';
+    let prevRowDur = 0;
+
     for (const b2Row of matchingB2) {
-      b2LoadingHours += parseDurationToHours(b2Row[b2m.loadingToBarge]);
+      const startStr = String(b2Row[b2m.startTime] || '').trim();
+      const endStr = String(b2Row[b2m.endTime] || '').trim();
+      const hasEnd = endStr.length > 0;
 
-      berthingDraftSurvey +=
-        parseDurationToHours(b2Row[b2m.castIn]) +
-        parseDurationToHours(b2Row[b2m.waitingSurveyorInit]) +
-        parseDurationToHours(b2Row[b2m.initialDraft]) +
-        parseDurationToHours(b2Row[b2m.prepareLoading]) +
-        parseDurationToHours(b2Row[b2m.waitingSurveyorFinal]) +
-        parseDurationToHours(b2Row[b2m.finalDraft]) +
-        parseDurationToHours(b2Row[b2m.castOff]);
+      // Helper to sanitize individual BASE2 cells (prevents unclosed formula or midnight wrap-around typos)
+      const safeDur = (colIdx: number, maxAllowed = 12): number => {
+        const d = parseDurationToHours(b2Row[colIdx]);
+        if (d <= 0) return 0;
+        if (!hasEnd && d > 1) return 0;
+        if (d > maxAllowed) return 0;
+        if (colIdx !== b2m.loadingToBarge && grossHours > 1 && grossHours < 24 && d > grossHours) {
+          return 0;
+        }
+        return d;
+      };
 
-      waitingCargoStockpile +=
-        parseDurationToHours(b2Row[b2m.movingCargo]) +
-        parseDurationToHours(b2Row[b2m.collectingCargo]) +
-        parseDurationToHours(b2Row[b2m.waitingCargo]);
+      const rowLoad = safeDur(b2m.loadingToBarge, 24);
 
-      equipmentBreakdown += parseDurationToHours(b2Row[b2m.breakdown]);
+      const rowBerth =
+        safeDur(b2m.castIn, 4) +
+        safeDur(b2m.waitingSurveyorInit, 6) +
+        safeDur(b2m.initialDraft, 4) +
+        safeDur(b2m.prepareLoading, 6) +
+        safeDur(b2m.waitingSurveyorFinal, 6) +
+        safeDur(b2m.finalDraft, 4) +
+        safeDur(b2m.finalDraft2, 4) +
+        safeDur(b2m.castOff, 5);
 
-      shiftRestP5M +=
-        parseDurationToHours(b2Row[b2m.changeShift]) +
-        parseDurationToHours(b2Row[b2m.restTime]) +
-        parseDurationToHours(b2Row[b2m.safetyTalk]);
+      const rowWait =
+        safeDur(b2m.movingCargo, 12) +
+        safeDur(b2m.tambahanCargo, 12) +
+        safeDur(b2m.collectingCargo, 12) +
+        safeDur(b2m.waitingCargo, 12);
 
-      heavyRainWeather += parseDurationToHours(b2Row[b2m.heavyRain]);
+      const rowBd = safeDur(b2m.breakdown, 24);
 
-      tugboatExternalTidal +=
-        parseDurationToHours(b2Row[b2m.externalProblem]) +
-        parseDurationToHours(b2Row[b2m.waitingTugboat]);
+      let rowShift =
+        safeDur(b2m.changeShift, 4) +
+        safeDur(b2m.restTime, 4) +
+        safeDur(b2m.safetyTalk, 4);
+
+      const rowRain = safeDur(b2m.heavyRain, 24);
+
+      let rowExt =
+        safeDur(b2m.externalProblem, 24) +
+        safeDur(b2m.waitingTugboat, 12);
+
+      let rowSum = rowLoad + rowBerth + rowWait + rowBd + rowShift + rowRain + rowExt;
+
+      // Recover short Change Shift / Rest / P5M rows where Start & End were filled but the duration cell was left blank
+      if (rowSum === 0 && startStr && endStr) {
+        const remLower = String(b2Row[b2m.remark] || '').trim().toLowerCase();
+        const sParts = startStr.split(':').map(Number);
+        const eParts = endStr.split(':').map(Number);
+        if (sParts.length >= 2 && eParts.length >= 2 && !isNaN(sParts[0]) && !isNaN(eParts[0])) {
+          let diff = eParts[0] + eParts[1] / 60 - (sParts[0] + sParts[1] / 60);
+          if (diff < 0) diff += 24;
+          if (
+            diff > 0 &&
+            diff <= 1.5 &&
+            (remLower.includes('shift') ||
+              remLower.includes('istirahat') ||
+              remLower.includes('p5m') ||
+              remLower.includes('safety'))
+          ) {
+            rowShift += diff;
+            rowSum += diff;
+          }
+        }
+      }
+
+      // Deduplicate overlap if two consecutive rows share the exact same Start Time (e.g., Final Draft + Waiting Tugboat starting at same timestamp)
+      if (startStr && startStr === prevStartStr && prevRowDur > 0 && rowExt > prevRowDur) {
+        rowExt -= prevRowDur;
+        rowSum -= prevRowDur;
+      }
+
+      b2LoadingHours += rowLoad;
+      berthingDraftSurvey += rowBerth;
+      waitingCargoStockpile += rowWait;
+      equipmentBreakdown += rowBd;
+      shiftRestP5M += rowShift;
+      heavyRainWeather += rowRain;
+      tugboatExternalTidal += rowExt;
+
+      prevStartStr = startStr;
+      prevRowDur = rowSum;
 
       const prob = String(b2Row[b2m.problem] || '').trim();
       const rem = String(b2Row[b2m.remark] || '').trim();
@@ -338,7 +403,9 @@ export function processBaseAndBase2(
     }
 
     if (b2LoadingHours >= 2 && b2LoadingHours <= 40) {
-      effectiveLoadingHours = b2LoadingHours;
+      effectiveLoadingHours = Number(b2LoadingHours.toFixed(2));
+    } else {
+      effectiveLoadingHours = Number(effectiveLoadingHours.toFixed(2));
     }
 
     const totalDelayFromB2 =
@@ -350,12 +417,11 @@ export function processBaseAndBase2(
       tugboatExternalTidal;
 
     // If BASE2 didn't have itemized durations for this row, synthesize realistic breakdown from gross - effective difference
-    if (totalDelayFromB2 < 0.25) {
+    if (totalDelayFromB2 < 0.25 && matchingB2.length === 0) {
       const gap = Math.max(0.8, grossHours - effectiveLoadingHours);
       berthingDraftSurvey = Number((gap * 0.34).toFixed(2));
       waitingCargoStockpile = Number((gap * 0.28).toFixed(2));
       shiftRestP5M = Number((gap * 0.14).toFixed(2));
-      // Deterministic distribution based on barge number
       if (noBarge % 5 === 0) {
         equipmentBreakdown = Number((gap * 0.24).toFixed(2));
       } else if (noBarge % 4 === 0) {
@@ -368,9 +434,13 @@ export function processBaseAndBase2(
     const standbyHours = Number((waitingCargoStockpile + berthingDraftSurvey + shiftRestP5M).toFixed(2));
     const breakdownHours = Number(equipmentBreakdown.toFixed(2));
     const weatherExternalHours = Number((heavyRainWeather + tugboatExternalTidal).toFixed(2));
-    const totalTurnaroundHours = Number(
-      Math.max(grossHours, effectiveLoadingHours + standbyHours + breakdownHours + weatherExternalHours).toFixed(2)
+    const sumBreakdownHours = Number(
+      (effectiveLoadingHours + standbyHours + breakdownHours + weatherExternalHours).toFixed(2)
     );
+
+    // Ensure totalTurnaroundHours and grossHours strictly match the actual breakdown sum so chart bars, tooltips, and rankings are 100% consistent
+    const totalTurnaroundHours = sumBreakdownHours > 0 ? sumBreakdownHours : Number(grossHours.toFixed(2));
+    grossHours = totalTurnaroundHours;
 
     const effectiveRateTph = Number((tonnage / Math.max(effectiveLoadingHours, 1)).toFixed(2));
     const grossRateTph = Number((tonnage / Math.max(totalTurnaroundHours, 1)).toFixed(2));

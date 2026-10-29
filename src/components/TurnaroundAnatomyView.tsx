@@ -34,27 +34,32 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
   const sortedByWorstTat = useMemo(() => {
     const topLimit = Math.min(10, barges.length);
     return [...barges]
+      .map((b) => {
+        const stackedTotal = Number(
+          (b.effectiveLoadingHours + b.standbyHours + b.breakdownHours + b.weatherExternalHours).toFixed(2)
+        );
+        return {
+          label: `${b.bargeName} (#${b.noBarge})`,
+          shortName: b.bargeName,
+          noBarge: b.noBarge,
+          tugBoat: b.tugBoat,
+          dateStr: b.dateStr,
+          inPositionStr: b.inPositionStr,
+          commencedLoadingStr: b.commencedLoadingStr,
+          completedLoadingStr: b.completedLoadingStr,
+          castOffStr: b.castOffStr,
+          tonnage: b.tonnage,
+          effectiveLoadingHours: b.effectiveLoadingHours,
+          standbyHours: b.standbyHours,
+          breakdownHours: b.breakdownHours,
+          weatherExternalHours: b.weatherExternalHours,
+          totalTurnaroundHours: stackedTotal > 0 ? stackedTotal : b.totalTurnaroundHours,
+          grossRateTph: b.grossRateTph,
+          effectiveRateTph: b.effectiveRateTph,
+        };
+      })
       .sort((a, b) => b.totalTurnaroundHours - a.totalTurnaroundHours)
-      .slice(0, topLimit)
-      .map((b) => ({
-        label: `${b.bargeName} (#${b.noBarge})`,
-        shortName: b.bargeName,
-        noBarge: b.noBarge,
-        tugBoat: b.tugBoat,
-        dateStr: b.dateStr,
-        inPositionStr: b.inPositionStr,
-        commencedLoadingStr: b.commencedLoadingStr,
-        completedLoadingStr: b.completedLoadingStr,
-        castOffStr: b.castOffStr,
-        tonnage: b.tonnage,
-        effectiveLoadingHours: b.effectiveLoadingHours,
-        standbyHours: b.standbyHours,
-        breakdownHours: b.breakdownHours,
-        weatherExternalHours: b.weatherExternalHours,
-        totalTurnaroundHours: b.totalTurnaroundHours,
-        grossRateTph: b.grossRateTph,
-        effectiveRateTph: b.effectiveRateTph,
-      }));
+      .slice(0, topLimit);
   }, [barges]);
 
   // Pareto Bottleneck calculation across all filtered 2026 barges from BASE/BASE2
@@ -154,15 +159,19 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
           </span>
         </div>
         <div className="mb-2.5 px-2.5 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] text-slate-300 space-y-0.5">
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-slate-400">Tanggal Kejadian Pemuatan:</span>
             <strong className="font-mono-num text-emerald-300">{d.dateStr}</strong>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
+            <span className="text-slate-400">Sandar – Cast Off:</span>
+            <span className="font-mono-num text-slate-200">{d.inPositionStr} s/d {d.castOffStr}</span>
+          </div>
+          <div className="flex justify-between gap-3">
             <span className="text-slate-400">Mulai – Selesai Muat:</span>
             <span className="font-mono-num text-slate-200">{d.commencedLoadingStr} s/d {d.completedLoadingStr}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex justify-between gap-3">
             <span className="text-slate-400">Tonase Muat:</span>
             <strong className="font-mono-num text-white">{d.tonnage.toLocaleString('id-ID')} MT</strong>
           </div>
@@ -298,7 +307,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
-              Visualisasi 1: Barge Turnaround Time (TAT) Breakdown {sortedByWorstTat.length > 0 ? `(TOP ${sortedByWorstTat.length} Durasi Sandar Terlama)` : ''}
+              Top 10 Gross Loading Time
             </h3>
             <p className="text-xs text-emerald-400/80 mt-0.5">
               Arahkan kursor ke grafik batang untuk melihat tanggal kejadian pemuatan tongkang &amp; rincian durasi sandar.
@@ -413,7 +422,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
         <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
-              Visualisasi 2: Gross vs Effective Loading Rate per Barge vs Target 1.350 TPH
+              Gross vs Net Loading Productivity
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Menunjukkan seberapa besar kecepatan muat tergerus oleh waktu tunggu sandar (arahkan kursor untuk melihat tanggal pemuatan).
@@ -499,7 +508,7 @@ export const TurnaroundAnatomyView: React.FC<TurnaroundAnatomyViewProps> = ({ ba
         <div className="lg:col-span-6 bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
-              Visualisasi 3: Pareto Bottleneck Pelabuhan 2026 (Sheet BASE &amp; BASE2)
+              Pareto Delay Loading Barge
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
               Meranking penyebab utama hilangnya jam operasional pelabuhan agar manajemen tahu faktor nomor 1 yang wajib diperbaiki hari ini.
