@@ -8,8 +8,8 @@ import {
   Clock,
   Flame,
   Gauge,
+  ShieldAlert,
   Ship,
-  Truck,
 } from 'lucide-react';
 import {
   Bar,
@@ -29,8 +29,7 @@ import { BargeRecord, ExecutiveMatrix, PeriodType } from '../types';
 
 interface MorningMeetingViewProps {
   matrix: ExecutiveMatrix;
-  selectedPeriod: PeriodType;
-  onSelectPeriod: (p: PeriodType) => void;
+  selectedMonthFilter: string;
   filteredBarges: BargeRecord[];
 }
 
@@ -38,8 +37,7 @@ const PERIODS: PeriodType[] = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
 
 export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
   matrix,
-  selectedPeriod,
-  onSelectPeriod,
+  selectedMonthFilter,
   filteredBarges,
 }) => {
   // Prepare 4-Matrix Comparison Chart data
@@ -56,57 +54,71 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
     cycleTimeActual: matrix.cycleTimeFlatDeck[p].actual,
   }));
 
-  // Filtered summary from BASE & BASE2 for the selected filter window
+  // Monthly barges corresponding to the selected month in the dropdown (defaults to running month 2026-10 when ALL_2026)
+  const targetMonthKey =
+    !selectedMonthFilter || selectedMonthFilter === 'ALL_2026' ? '2026-10' : selectedMonthFilter;
+  const monthlyBarges =
+    selectedMonthFilter === 'ALL_2026'
+      ? filteredBarges.filter((b) => b.monthKey === targetMonthKey)
+      : filteredBarges;
+
   const avgFilteredEffectiveLoadingHours =
-    filteredBarges.length > 0
-      ? filteredBarges.reduce((s, b) => s + b.effectiveLoadingHours, 0) / filteredBarges.length
-      : Number((matrix.portIdleDelay[selectedPeriod].actual * 0.68).toFixed(2));
+    monthlyBarges.length > 0
+      ? monthlyBarges.reduce((s, b) => s + b.effectiveLoadingHours, 0) / monthlyBarges.length
+      : Number((matrix.portIdleDelay.Monthly.actual * 0.68).toFixed(2));
   const avgFilteredGrossHours =
-    filteredBarges.length > 0
-      ? filteredBarges.reduce((s, b) => s + b.totalTurnaroundHours, 0) / filteredBarges.length
-      : matrix.portIdleDelay[selectedPeriod].actual;
+    monthlyBarges.length > 0
+      ? monthlyBarges.reduce((s, b) => s + b.totalTurnaroundHours, 0) / monthlyBarges.length
+      : matrix.portIdleDelay.Monthly.actual;
   const avgFilteredDelayHours = Math.max(0, avgFilteredGrossHours - avgFilteredEffectiveLoadingHours);
 
-  const activeCycleTime = matrix.cycleTimeFlatDeck[selectedPeriod].actual;
-  const activeBlcRate = matrix.blcRate[selectedPeriod].actual;
+  const activeBlcRate = matrix.blcRate.Monthly.actual;
   const isBlcOnTarget = activeBlcRate >= 1350;
+
+  const overLaytimeBarges = [...monthlyBarges]
+    .filter((b) => b.totalTurnaroundHours > 9.5)
+    .sort((a, b) => b.totalTurnaroundHours - a.totalTurnaroundHours);
+
+  const underTargetBlcBarges = [...monthlyBarges]
+    .filter((b) => b.effectiveRateTph > 0 && b.effectiveRateTph < 1350)
+    .sort((a, b) => a.effectiveRateTph - b.effectiveRateTph);
 
   return (
     <div className="space-y-5">
-      {/* Compact Overview Header (No duplicate period selector box) */}
+      {/* Compact Overview Header showing Monthly period for selected month */}
       <div className="inline-flex items-center gap-2.5 bg-slate-900/90 border border-slate-800 rounded-lg px-4 py-2 shadow-sm">
         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         <h2 className="text-sm font-bold tracking-wide text-slate-100">
           Overview
         </h2>
         <span className="text-xs text-slate-400 font-mono-num border-l border-slate-800 pl-2.5">
-          {selectedPeriod === 'Yearly' ? 'Yearly 2026' : selectedPeriod} · {matrix.periodLabel[selectedPeriod]}
+          Monthly · {matrix.periodLabel.Monthly}
         </span>
       </div>
 
-      {/* Focused Period Highlight Strip (4 Primary KPIs with Distinct Vibrant Gradients) */}
+      {/* Focused Monthly Highlight Strip (4 Primary KPIs with Distinct Vibrant Gradients) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Card A: Tonase Loading to Barge — Vibrant Blue Gradient */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-sky-500 to-blue-700 border border-sky-300/30 rounded-xl p-5 text-white shadow-lg shadow-blue-950/50 flex flex-col justify-between">
           <Ship className="w-14 h-14 text-white/20 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <div className="relative z-10">
             <div className="text-xs font-semibold text-blue-50/90">
-              Tonase Loading to Barge ({selectedPeriod})
+              Tonase Loading to Barge (Monthly)
             </div>
-            <div className="text-[11px] text-blue-100/80 mt-0.5">{matrix.periodLabel[selectedPeriod]}</div>
+            <div className="text-[11px] text-blue-100/80 mt-0.5">{matrix.periodLabel.Monthly}</div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-extrabold font-mono-num text-white drop-shadow-xs">
-                {matrix.loadingTonase[selectedPeriod].actual.toLocaleString('id-ID')}
+                {matrix.loadingTonase.Monthly.actual.toLocaleString('id-ID')}
               </span>
               <span className="text-xs font-medium text-blue-100">Ton</span>
             </div>
           </div>
           <div className="relative z-10 mt-4 pt-3 border-t border-white/20 flex items-center justify-between text-xs">
             <span className="text-blue-50/90">
-              Plan: <strong className="font-mono-num text-white">{matrix.loadingTonase[selectedPeriod].plan.toLocaleString('id-ID')}</strong> T
+              Plan: <strong className="font-mono-num text-white">{matrix.loadingTonase.Monthly.plan.toLocaleString('id-ID')}</strong> T
             </span>
             <span className="font-mono-num font-bold px-2 py-0.5 rounded bg-black/20 text-white">
-              %Ach: {matrix.loadingTonase[selectedPeriod].achievementPct.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+              %Ach: {matrix.loadingTonase.Monthly.achievementPct.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
             </span>
           </div>
         </div>
@@ -141,7 +153,7 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
               )}
             </span>
             <span className="font-mono-num font-bold px-2 py-0.5 rounded bg-black/20 text-white">
-              %Ach: {matrix.blcRate[selectedPeriod].achievementPct.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+              %Ach: {matrix.blcRate.Monthly.achievementPct.toLocaleString('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
             </span>
           </div>
         </div>
@@ -151,12 +163,12 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
           <Clock className="w-14 h-14 text-slate-950/15 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <div className="relative z-10">
             <div className="text-xs font-bold text-slate-900/90">
-              Port Idle / Turnaround Time ({selectedPeriod})
+              Port Idle / Turnaround Time (Monthly)
             </div>
             <div className="text-[11px] font-medium text-slate-900/75 mt-0.5">Batas Standar Sandar: 8,22 – 8,78 Jam</div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-extrabold font-mono-num text-slate-950">
-                {matrix.portIdleDelay[selectedPeriod].actual.toLocaleString('id-ID', {
+                {matrix.portIdleDelay.Monthly.actual.toLocaleString('id-ID', {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 })}
@@ -166,24 +178,24 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
           </div>
           <div className="relative z-10 mt-4 pt-3 border-t border-slate-950/15 flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-900/85">
-              Plan: <strong className="font-mono-num text-slate-950">{matrix.portIdleDelay[selectedPeriod].plan.toLocaleString('id-ID')}</strong> Jam
+              Plan: <strong className="font-mono-num text-slate-950">{matrix.portIdleDelay.Monthly.plan.toLocaleString('id-ID')}</strong> Jam
             </span>
             <span className="font-mono-num font-bold px-2 py-0.5 rounded bg-slate-950/15 text-slate-950">
-              Selisih: {matrix.portIdleDelay[selectedPeriod].variance > 0 ? '+' : ''}
-              {matrix.portIdleDelay[selectedPeriod].variance.toLocaleString('id-ID')} Jam
+              Selisih: {matrix.portIdleDelay.Monthly.variance > 0 ? '+' : ''}
+              {matrix.portIdleDelay.Monthly.variance.toLocaleString('id-ID')} Jam
             </span>
           </div>
         </div>
 
-        {/* Card D: Loading Time per Tongkang (During Selected Period) — Vibrant Purple/Indigo Gradient */}
+        {/* Card D: Loading Time per Tongkang (During Selected Month) — Vibrant Purple/Indigo Gradient */}
         <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 border border-indigo-300/30 rounded-xl p-5 text-white shadow-lg shadow-indigo-950/50 flex flex-col justify-between">
           <Activity className="w-14 h-14 text-white/20 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <div className="relative z-10">
             <div className="text-xs font-semibold text-indigo-50/90">
-              Loading Time per Tongkang ({selectedPeriod})
+              Loading Time per Tongkang (Monthly)
             </div>
             <div className="text-[11px] text-indigo-100/80 mt-0.5">
-              {filteredBarges.length} Tongkang ({matrix.periodLabel[selectedPeriod]})
+              {monthlyBarges.length} Tongkang ({matrix.periodLabel.Monthly})
             </div>
             <div className="mt-3 flex items-baseline gap-2">
               <span className="text-2xl font-extrabold font-mono-num text-white drop-shadow-xs">
@@ -235,9 +247,8 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
                 {PERIODS.map((p) => (
                   <th
                     key={p}
-                    onClick={() => onSelectPeriod(p)}
-                    className={`py-3 px-4 text-right cursor-pointer transition-colors ${
-                      selectedPeriod === p ? 'bg-sky-950/40 text-sky-300' : 'hover:bg-slate-900'
+                    className={`py-3 px-4 text-right transition-colors ${
+                      p === 'Monthly' ? 'bg-sky-950/40 text-sky-300' : ''
                     }`}
                   >
                     <div className="font-bold text-slate-200">{p === 'Yearly' ? 'Yearly 2026' : p}</div>
@@ -390,73 +401,83 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
         </div>
       </div>
 
-      {/* SECTION D: KORELASI HULU-HILIR (EARLY WARNING SYSTEM) & VISUAL COMPARISON */}
+      {/* SECTION D: EXECUTIVE DECISION EVALUATION CARDS & VISUAL COMPARISON */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left 7 Cols: Early Warning Hulu-Hilir Panel */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-lg p-5 flex flex-col justify-between">
-            <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-slate-100">
-                Korelasi Hulu–Hilir (Early Warning System: Suplai Hauling vs Jetty BLC)
-              </h3>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Mendiagnosis apakah pelambatan muat tongkang disebabkan oleh masalah internal Jetty/BLC atau keterlambatan suplai kargo dari Hauling/Stockpile.
-            </p>
-
-            {/* Upstream vs Downstream Comparison Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-              <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5">
-                <div className="text-xs text-slate-400">Hulu: Hauling / Stockpile ({selectedPeriod})</div>
-                <div className="text-lg font-bold font-mono-num text-slate-100 mt-1">
-                  {matrix.haulingTonase[selectedPeriod].actual.toLocaleString('id-ID')} MT
-                </div>
-                <div className="text-xs text-slate-400 mt-1 flex items-center justify-between">
-                  <span>Plan: {matrix.haulingTonase[selectedPeriod].plan.toLocaleString('id-ID')}</span>
-                  <span
-                    className={`font-mono-num font-semibold ${
-                      matrix.haulingTonase[selectedPeriod].achievementPct >= 100
-                        ? 'text-emerald-400'
-                        : 'text-rose-400'
-                    }`}
-                  >
-                    {matrix.haulingTonase[selectedPeriod].achievementPct}%
-                  </span>
-                </div>
+        {/* Left 7 Cols: 2 Executive Decision Cards (Over-Laytime & Evaluasi BLC Rate) */}
+        <div className="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Card 1: Tongkang Over-Laytime / Risiko Demurrage (>9,5 Jam) */}
+          <div className="bg-slate-950/90 border border-rose-500/40 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-xs font-bold text-rose-400 leading-snug">
+                  1. Tongkang Over-Laytime / Risiko Demurrage (&gt;9,5 Jam)
+                </h3>
+                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               </div>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                Terdapat <strong className="text-white font-mono-num">{overLaytimeBarges.length} tongkang</strong> pada periode ini yang melampaui batas jam sandar aman (8,22 – 8,78 jam):
+              </p>
 
-              <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5">
-                <div className="text-xs text-slate-400">Hilir: Loading to Barge ({selectedPeriod})</div>
-                <div className="text-lg font-bold font-mono-num text-slate-100 mt-1">
-                  {matrix.loadingTonase[selectedPeriod].actual.toLocaleString('id-ID')} MT
-                </div>
-                <div className="text-xs text-slate-400 mt-1 flex items-center justify-between">
-                  <span>Plan: {matrix.loadingTonase[selectedPeriod].plan.toLocaleString('id-ID')}</span>
-                  <span
-                    className={`font-mono-num font-semibold ${
-                      matrix.loadingTonase[selectedPeriod].achievementPct >= 100
-                        ? 'text-emerald-400'
-                        : 'text-rose-400'
-                    }`}
-                  >
-                    {matrix.loadingTonase[selectedPeriod].achievementPct}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-slate-950 border border-slate-800/80 rounded-lg p-3.5">
-                <div className="text-xs text-slate-400">Cycle Time &amp; Unit Flat Deck</div>
-                <div className="text-lg font-bold font-mono-num text-rose-400 mt-1">
-                  {activeCycleTime.toLocaleString('id-ID')} Min
-                </div>
-                <div className="text-xs text-slate-400 mt-1 flex items-center justify-between">
-                  <span>Target: 120,00 Min</span>
-                  <span className="font-mono-num text-slate-200 font-semibold">
-                    {matrix.flatDeckRunning[selectedPeriod].actual} / {matrix.flatDeckRunning[selectedPeriod].plan} Unit
-                  </span>
-                </div>
+              <div className="mt-3.5 space-y-2">
+                {overLaytimeBarges.length === 0 ? (
+                  <div className="text-xs text-slate-400 bg-slate-900/70 border border-slate-800 rounded-md px-3 py-4 text-center">
+                    Tidak ada tongkang yang melampaui 9,5 jam sandar pada periode ini.
+                  </div>
+                ) : (
+                  overLaytimeBarges.slice(0, 4).map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 text-xs bg-slate-900/90 border border-slate-800 rounded-md px-3 py-2"
+                    >
+                      <span className="text-slate-100 font-semibold truncate">
+                        {b.bargeName} <span className="text-slate-400 font-normal">({b.dateStr})</span>
+                      </span>
+                      <span className="font-mono-num font-bold text-rose-400 shrink-0">
+                        TAT: {b.totalTurnaroundHours.toFixed(2)} Jam
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Card 2: Evaluasi BLC Rate Jatuh < 1.350 TPH */}
+          <div className="bg-slate-950/90 border border-amber-500/40 rounded-xl p-5 flex flex-col justify-between shadow-lg shadow-black/40">
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-xs font-bold text-amber-400 leading-snug">
+                  2. Evaluasi BLC Rate Jatuh &lt; 1.350 TPH
+                </h3>
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              </div>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                Tercatat <strong className="text-white font-mono-num">{underTargetBlcBarges.length} tongkang</strong> dengan produktivitas muat di bawah standar baku 1.350 TPH:
+              </p>
+
+              <div className="mt-3.5 space-y-2">
+                {underTargetBlcBarges.length === 0 ? (
+                  <div className="text-xs text-slate-400 bg-slate-900/70 border border-slate-800 rounded-md px-3 py-4 text-center">
+                    Seluruh tongkang mencapai target ≥ 1.350 TPH pada periode ini.
+                  </div>
+                ) : (
+                  underTargetBlcBarges.slice(0, 4).map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex items-center justify-between gap-2 text-xs bg-slate-900/90 border border-slate-800 rounded-md px-3 py-2"
+                    >
+                      <span className="text-slate-100 font-semibold truncate">
+                        {b.bargeName} <span className="text-slate-400 font-normal">({b.dateStr})</span>
+                      </span>
+                      <span className="font-mono-num font-bold text-amber-400 shrink-0">
+                        {Math.round(b.effectiveRateTph)} TPH
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right 5 Cols: BLC Rate Across 4 Timeframes Chart vs 1.350 TPH */}

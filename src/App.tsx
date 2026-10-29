@@ -289,13 +289,20 @@ export default function App() {
 
   const handleMonthFilterChange = (mKey: string) => {
     setSelectedMonthFilter(mKey);
-    applyDateBoundsForPeriodAndMonth(selectedPeriod, mKey);
+    setSelectedPeriod('Monthly');
+    if (mKey === 'ALL_2026') {
+      setDateRangeStart('2026-01-01');
+      setDateRangeEnd('2026-12-31');
+    } else {
+      applyDateBoundsForPeriodAndMonth('Monthly', mKey);
+    }
   };
 
   const handleResetFilters = () => {
     setSelectedMonthFilter('ALL_2026');
     setSelectedPeriod('Monthly');
-    applyDateBoundsForPeriodAndMonth('Monthly', 'ALL_2026');
+    setDateRangeStart('2026-01-01');
+    setDateRangeEnd('2026-12-31');
     setSelectedBargeName('ALL');
   };
 
@@ -437,25 +444,8 @@ export default function App() {
                 </button>
               </div>
 
-            {/* Global Filter Controls: Periode, Bulan 2026, Rentang Tanggal, Nama Tongkang */}
+            {/* Global Filter Controls: Bulan 2026, Rentang Tanggal, Nama Tongkang */}
             <div className="flex flex-wrap items-center gap-2.5 text-xs w-full xl:w-auto justify-between xl:justify-start">
-              {/* Period Segmented Control */}
-              <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg p-1">
-                {(['Daily', 'Weekly', 'Monthly', 'Yearly'] as PeriodType[]).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => handleSelectPeriod(p)}
-                    className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
-                      selectedPeriod === p
-                        ? 'bg-sky-600 text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {p === 'Yearly' ? 'Yearly (2026)' : p}
-                  </button>
-                ))}
-              </div>
-
               {/* Filter Bulan 2026 */}
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400 whitespace-nowrap">Bulan:</span>
@@ -548,8 +538,7 @@ export default function App() {
         {activeTab === 'MORNING_MEETING' && (
           <MorningMeetingView
             matrix={executiveMatrix}
-            selectedPeriod={selectedPeriod}
-            onSelectPeriod={handleSelectPeriod}
+            selectedMonthFilter={selectedMonthFilter}
             filteredBarges={filteredBarges}
           />
         )}
