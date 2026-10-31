@@ -72,7 +72,9 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
   showKpiCardsAndTable = true,
 }) => {
   const [chartPeriod, setChartPeriod] = useState<PeriodType>('Monthly');
+  const [durasiChartPeriod, setDurasiChartPeriod] = useState<PeriodType>('Monthly');
   const [isDetailTableOpen, setIsDetailTableOpen] = useState<boolean>(defaultExpandTable);
+  const [isDurasiDetailOpen, setIsDurasiDetailOpen] = useState<boolean>(false);
 
   const kpi = useMemo(
     () =>
@@ -86,6 +88,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
 
   // Compute daily series for the active chartPeriod (Daily / Weekly / Monthly)
   const activePeriodMeta = kpi.periods[chartPeriod];
+  const activeDurasiPeriodMeta = kpi.periods[durasiChartPeriod];
 
   const dailyKaSeries = useMemo(
     () =>
@@ -97,6 +100,18 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
         { excludeOutlierDuration }
       ),
     [rows, activePeriodMeta.startDateIso, activePeriodMeta.endDateIso, config, excludeOutlierDuration]
+  );
+
+  const dailyDurasiSeries = useMemo(
+    () =>
+      computeDailyKa(
+        rows,
+        activeDurasiPeriodMeta.startDateIso,
+        activeDurasiPeriodMeta.endDateIso,
+        config,
+        { excludeOutlierDuration }
+      ),
+    [rows, activeDurasiPeriodMeta.startDateIso, activeDurasiPeriodMeta.endDateIso, config, excludeOutlierDuration]
   );
 
   const monthlyKaSeries = useMemo(
@@ -145,9 +160,48 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
     }));
   }, [chartPeriod, dailyKaSeries, monthlyKaSeries]);
 
-  const referencePlanKa = activePeriodMeta.planKaPerHari;
+  const durasiChartData: ChartBarDatum[] = useMemo(() => {
+    if (durasiChartPeriod === 'Yearly') {
+      return monthlyKaSeries.map((m) => ({
+        key: m.monthKey,
+        xLabel: m.monthLabel,
+        fullLabel: `${m.fullMonthLabel} (${m.calendarDays} hari)`,
+        value: m.avgDurasi !== null ? Number(m.avgDurasi.toFixed(2)) : 0,
+        jumlahKa: m.jumlahKa,
+        calendarDays: m.calendarDays,
+        planKa: m.planKaPerHari,
+        totalTonase: m.totalTonase,
+        avgDurasi: m.avgDurasi,
+        avgFd: m.avgFd,
+        kendalaList: m.kendalaList,
+        hasOutlier: m.hasOutlier,
+        outlierDetails: m.outlierDetails,
+        isYearlyMonth: true,
+      }));
+    }
 
-  // Stats for chart footer summary
+    return dailyDurasiSeries.map((d) => ({
+      key: d.dateIso,
+      xLabel: d.dateLabel,
+      fullLabel: d.fullDateLabel,
+      value: d.avgDurasi !== null ? Number(d.avgDurasi.toFixed(2)) : 0,
+      jumlahKa: d.jumlahKa,
+      calendarDays: 1,
+      planKa: d.planKa,
+      totalTonase: d.totalTonase,
+      avgDurasi: d.avgDurasi,
+      avgFd: d.avgFd,
+      kendalaList: d.kendalaList,
+      hasOutlier: d.hasOutlier,
+      outlierDetails: d.outlierDetails,
+      isYearlyMonth: false,
+    }));
+  }, [durasiChartPeriod, dailyDurasiSeries, monthlyKaSeries]);
+
+  const referencePlanKa = activePeriodMeta.planKaPerHari ?? config.planKaPerHari;
+  const referencePlanDurasi = config.planDurasiMenit;
+
+  // Stats for KA chart footer summary
   const chartStats = useMemo(() => {
     if (chartData.length === 0) return { min: 0, max: 0, avg: 0 };
     const vals = chartData.map((c) => c.value);
@@ -156,6 +210,17 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
     const avg = activePeriodMeta.actualKaPerHari ?? 0;
     return { min, max, avg };
   }, [chartData, activePeriodMeta.actualKaPerHari]);
+
+  // Stats for Durasi Bongkar chart footer summary
+  const durasiChartStats = useMemo(() => {
+    const validItems = durasiChartData.filter((c) => c.avgDurasi !== null && c.avgDurasi > 0);
+    if (validItems.length === 0) return { min: 0, max: 0, avg: 0 };
+    const vals = validItems.map((c) => c.avgDurasi as number);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const avg = activeDurasiPeriodMeta.actualDurasi ?? 0;
+    return { min, max, avg };
+  }, [durasiChartData, activeDurasiPeriodMeta.actualDurasi]);
 
   // Status evaluation helpers matching ATURAN WARNA STATUS
   const isTonGood = (actual: number | null, plan: number | null) =>
@@ -171,6 +236,11 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
 
   const isKaGood = (actual: number | null, plan: number | null) =>
     actual !== null && plan !== null && actual >= plan;
+
+  const formatPlanKaLabel = (val: number | null | undefined) => {
+    if (val === null || val === undefined) return '–';
+    return Number.isInteger(val) ? String(val) : formatHaulingDec2(val);
+  };
 
   return (
     <div className="space-y-5">
@@ -328,7 +398,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                 <span className="text-indigo-50/90">
                   Plan:{' '}
                   <strong className="font-mono-num text-white">
-                    {formatHaulingDec2(monthly.planKaPerHari)}
+                    {formatPlanKaLabel(monthly.planKaPerHari)}
                   </strong>{' '}
                   {monthly.planKaPerHari !== null ? 'KA/hari' : ''}
                 </span>
@@ -594,7 +664,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                     <td className="py-3 px-4 font-semibold text-slate-100" rowSpan={4}>
                       <div>KA Dibongkar per Hari (KA/hari)</div>
                       <div className="text-[11px] font-normal text-slate-400 mt-0.5">
-                        1 KA = {config.planTonPerKa.toLocaleString('id-ID')} MT · Pembagi Hari Kalender
+                        Target : {config.planKaPerHari} KA/hari · Pembagi Hari Kalender
                       </div>
                     </td>
                     <td className="py-2 px-3 text-center text-slate-400">Plan</td>
@@ -678,7 +748,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
         </>
       )}
 
-      {/* GRAFIK BAR "Jumlah KA Dibongkar per Hari" + EXPANDABLE DETAIL TABLE */}
+      {/* GRAFIK BAR 1: "Jumlah KA Dibongkar per Hari" + EXPANDABLE DETAIL TABLE */}
       <div className="bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 shadow-lg shadow-black/40">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
@@ -691,7 +761,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Garis putus-putus = Plan KA/hari ({formatHaulingDec2(referencePlanKa)} KA/hari) · Hijau = Mencapai Plan · Merah = Di Bawah Plan
+              Garis putus-putus = Plan KA/hari ({formatPlanKaLabel(referencePlanKa)} KA/hari) · Hijau = Mencapai Plan · Merah = Di Bawah Plan
             </p>
           </div>
 
@@ -777,7 +847,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                         <div className="flex justify-between gap-4">
                           <span className="text-slate-400">Plan KA/Hari:</span>
                           <span className="text-sky-300">
-                            {formatHaulingDec2(item.planKa)} KA/hari
+                            {formatPlanKaLabel(item.planKa)} KA/hari
                           </span>
                         </div>
                         <div className="flex justify-between gap-4">
@@ -839,7 +909,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                   strokeDasharray="4 4"
                   strokeWidth={2}
                   label={{
-                    value: `Plan: ${formatHaulingDec2(referencePlanKa)} KA/hari`,
+                    value: `Plan: ${formatPlanKaLabel(referencePlanKa)} KA/hari`,
                     position: 'insideTopRight',
                     fill: '#38BDF8',
                     fontSize: 11,
@@ -853,7 +923,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                 maxBarSize={36}
               >
                 {chartData.map((entry) => {
-                  const target = entry.planKa ?? referencePlanKa ?? 5.95;
+                  const target = entry.planKa ?? referencePlanKa ?? config.planKaPerHari;
                   const isGreen = entry.value >= target;
                   return (
                     <Cell
@@ -920,7 +990,7 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {chartData.map((row) => {
-                    const target = row.planKa ?? referencePlanKa ?? 5.95;
+                    const target = row.planKa ?? referencePlanKa ?? config.planKaPerHari;
                     const isKaMet = row.value >= target;
                     return (
                       <tr key={row.key} className="hover:bg-slate-900/60">
@@ -956,6 +1026,346 @@ export const HaulingKpiSection: React.FC<HaulingKpiSectionProps> = ({
                               Outlier
                             </span>
                           )}
+                        </td>
+                        <td className="py-2 px-3.5 text-right font-mono-num text-slate-200 whitespace-nowrap">
+                          {row.avgFd !== null ? `${formatHaulingDec2(row.avgFd)} FD` : '–'}
+                        </td>
+                        <td className="py-2 px-3.5 text-slate-300">
+                          {row.kendalaList.length > 0 ? (
+                            <span className="text-amber-300">{row.kendalaList.join('; ')}</span>
+                          ) : (
+                            <span className="text-slate-500">–</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* GRAFIK BAR 2: "Durasi Bongkar per KA" (Identical layout & behavior to Jumlah KA Dibongkar per Hari) */}
+      <div className="bg-gradient-to-br from-slate-900 via-[#071514] to-slate-950 border border-emerald-500/20 rounded-xl p-5 shadow-lg shadow-black/40">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-100">
+                Durasi Bongkar per KA
+              </h3>
+              <span className="text-xs font-mono-num text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 rounded px-2 py-0.5">
+                {durasiChartPeriod === 'Yearly'
+                  ? 'Yearly 2026 (Rata-rata Bulanan)'
+                  : `${durasiChartPeriod} · ${activeDurasiPeriodMeta.label}`}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Garis putus-putus = Plan Durasi ({referencePlanDurasi} menit/KA) · Hijau = Mencapai Plan (≤ {referencePlanDurasi} menit) · Merah = Melebihi Plan (&gt; {referencePlanDurasi} menit)
+            </p>
+          </div>
+
+          {/* Period Switcher for Durasi Chart (Default: Monthly) */}
+          <div className="flex items-center gap-1.5 bg-slate-950/90 border border-slate-800 rounded-lg p-1 self-start lg:self-auto">
+            {PERIODS.map((p) => (
+              <button
+                key={p}
+                onClick={() => setDurasiChartPeriod(p)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                  durasiChartPeriod === p
+                    ? 'bg-sky-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {p === 'Yearly' ? 'Yearly 2026' : p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Bar Chart Durasi Bongkar */}
+        <div className="h-72 w-full mt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={durasiChartData} margin={{ top: 16, right: 18, left: 0, bottom: 8 }}>
+              <defs>
+                <linearGradient id="durasiGreenGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#34D399" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#059669" stopOpacity={0.35} />
+                </linearGradient>
+                <linearGradient id="durasiRedGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#F87171" stopOpacity={0.95} />
+                  <stop offset="100%" stopColor="#DC2626" stopOpacity={0.35} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
+              <XAxis
+                dataKey="xLabel"
+                stroke="#94A3B8"
+                fontSize={11}
+                axisLine={false}
+                tickLine={false}
+                interval={durasiChartData.length > 20 ? 1 : 0}
+              />
+              <YAxis
+                stroke="#94A3B8"
+                fontSize={11}
+                domain={[0, (dataMax: number) => Math.max(180, Math.ceil((dataMax || 150) * 1.15))]}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip
+                cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const item = payload[0].payload as ChartBarDatum;
+                  const isOnPlan =
+                    item.avgDurasi !== null ? item.avgDurasi <= referencePlanDurasi : true;
+                  return (
+                    <div className="bg-[#061311] border border-emerald-500/40 rounded-xl p-3.5 text-xs text-slate-100 shadow-2xl max-w-xs space-y-2">
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-1.5">
+                        <span className="font-bold text-white">{item.fullLabel}</span>
+                        <span
+                          className={`font-mono-num font-bold px-2 py-0.5 rounded text-[11px] ${
+                            item.avgDurasi === null
+                              ? 'bg-slate-800 text-slate-400'
+                              : isOnPlan
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          }`}
+                        >
+                          {item.avgDurasi !== null
+                            ? `${formatHaulingDec2(item.avgDurasi)} menit`
+                            : 'Tidak Ada KA'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 font-mono-num text-[11px]">
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Rata-rata Durasi:</span>
+                          <span className="font-bold text-slate-100">
+                            {item.avgDurasi !== null
+                              ? `${formatHaulingDec2(item.avgDurasi)} menit/KA`
+                              : '–'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Plan Durasi:</span>
+                          <span className="text-sky-300">
+                            ≤ {referencePlanDurasi} menit/KA
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Selisih Durasi:</span>
+                          <span
+                            className={`font-bold ${
+                              item.avgDurasi === null
+                                ? 'text-slate-400'
+                                : isOnPlan
+                                ? 'text-emerald-400'
+                                : 'text-rose-400'
+                            }`}
+                          >
+                            {item.avgDurasi !== null
+                              ? `${formatHaulingSignedDec2(item.avgDurasi - referencePlanDurasi)} menit`
+                              : '–'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Jumlah KA:</span>
+                          <span className="font-bold text-slate-100">
+                            {formatHaulingInt(item.jumlahKa)} KA
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Total Tonase:</span>
+                          <span className="font-bold text-slate-100">
+                            {item.jumlahKa > 0
+                              ? `${formatHaulingTonExact(item.totalTonase)} MT`
+                              : '0 MT'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-4">
+                          <span className="text-slate-400">Rata-rata FD:</span>
+                          <span className="font-bold text-slate-100">
+                            {item.avgFd !== null
+                              ? `${formatHaulingDec2(item.avgFd)} FD`
+                              : '–'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {item.hasOutlier && (
+                        <div className="bg-amber-950/70 border border-amber-500/40 rounded-lg p-2 text-[11px] text-amber-200">
+                          <div className="font-bold flex items-center gap-1 text-amber-300">
+                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Outlier Durasi (&gt;{config.outlierDurationThresholdMinutes} mnt):</span>
+                          </div>
+                          {item.outlierDetails.map((od, i) => (
+                            <div key={i} className="mt-0.5 text-amber-100/90">
+                              {od}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {item.kendalaList.length > 0 && (
+                        <div className="border-t border-slate-800 pt-1.5 text-[11px]">
+                          <span className="text-slate-400 font-semibold">Kendala: </span>
+                          <span className="text-amber-300">
+                            {item.kendalaList.join(' · ')}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }}
+              />
+              <ReferenceLine
+                y={referencePlanDurasi}
+                stroke="#38BDF8"
+                strokeDasharray="4 4"
+                strokeWidth={2}
+                label={{
+                  value: `Plan: ${referencePlanDurasi} menit/KA`,
+                  position: 'insideTopRight',
+                  fill: '#38BDF8',
+                  fontSize: 11,
+                }}
+              />
+              <Bar
+                dataKey="value"
+                name="Durasi Bongkar (menit/KA)"
+                radius={[5, 5, 0, 0]}
+                maxBarSize={36}
+              >
+                {durasiChartData.map((entry) => {
+                  const isGreen =
+                    entry.avgDurasi !== null && entry.avgDurasi <= referencePlanDurasi;
+                  return (
+                    <Cell
+                      key={entry.key}
+                      fill={isGreen ? 'url(#durasiGreenGrad)' : 'url(#durasiRedGrad)'}
+                      stroke={isGreen ? '#10B981' : '#EF4444'}
+                      strokeWidth={1}
+                    />
+                  );
+                })}
+              </Bar>
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Summary Footer + Expandable Detail Table Button for Durasi Bongkar */}
+        <div className="mt-3 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-4 font-mono-num">
+            <span>
+              Total: <strong className="text-slate-200">{formatHaulingInt(activeDurasiPeriodMeta.totalKa)} KA</strong> ({activeDurasiPeriodMeta.calendarDays} hari)
+            </span>
+            <span>
+              Rata-rata:{' '}
+              <strong
+                className={
+                  durasiChartStats.avg > 0 && durasiChartStats.avg <= referencePlanDurasi
+                    ? 'text-emerald-400'
+                    : 'text-rose-400'
+                }
+              >
+                {formatHaulingDec2(durasiChartStats.avg)} menit/KA
+              </strong>
+            </span>
+            <span>
+              Min: <strong className="text-slate-200">{formatHaulingDec2(durasiChartStats.min)} menit</strong>
+            </span>
+            <span>
+              Maks: <strong className="text-slate-200">{formatHaulingDec2(durasiChartStats.max)} menit</strong>
+            </span>
+          </div>
+
+          <button
+            onClick={() => setIsDurasiDetailOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 font-semibold transition-colors"
+          >
+            <span>
+              {isDurasiDetailOpen
+                ? 'Sembunyikan Detail Harian'
+                : `Lihat Tabel Detail (${durasiChartData.length} ${durasiChartPeriod === 'Yearly' ? 'Bulan' : 'Hari'})`}
+            </span>
+            {isDurasiDetailOpen ? (
+              <ChevronUp className="w-3.5 h-3.5" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </div>
+
+        {/* Expandable Small Table for Durasi Bongkar */}
+        {isDurasiDetailOpen && (
+          <div className="mt-4 border border-slate-800 rounded-lg overflow-hidden bg-slate-950/80">
+            <div className="max-h-80 overflow-y-auto overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 font-semibold">
+                  <tr>
+                    <th className="py-2.5 px-3.5">
+                      {durasiChartPeriod === 'Yearly' ? 'Bulan (2026)' : 'Tanggal'}
+                    </th>
+                    <th className="py-2.5 px-3.5 text-right">Rata-rata Durasi</th>
+                    <th className="py-2.5 px-3.5 text-right">Selisih vs Plan</th>
+                    <th className="py-2.5 px-3.5 text-right">Jumlah KA</th>
+                    <th className="py-2.5 px-3.5 text-right">Tonase</th>
+                    <th className="py-2.5 px-3.5 text-right">Rata-rata FD</th>
+                    <th className="py-2.5 px-3.5">Kendala</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {durasiChartData.map((row) => {
+                    const isDurMet =
+                      row.avgDurasi !== null && row.avgDurasi <= referencePlanDurasi;
+                    const diffDur =
+                      row.avgDurasi !== null ? row.avgDurasi - referencePlanDurasi : null;
+                    return (
+                      <tr key={row.key} className="hover:bg-slate-900/60">
+                        <td className="py-2 px-3.5 font-mono-num text-slate-200 whitespace-nowrap">
+                          {row.fullLabel}
+                        </td>
+                        <td
+                          className={`py-2 px-3.5 text-right font-mono-num font-bold whitespace-nowrap ${
+                            row.avgDurasi === null
+                              ? 'text-slate-500'
+                              : isDurMet
+                              ? 'text-emerald-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {row.avgDurasi !== null
+                            ? `${formatHaulingDec2(row.avgDurasi)} menit`
+                            : '–'}
+                          {row.hasOutlier && (
+                            <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">
+                              Outlier
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className={`py-2 px-3.5 text-right font-mono-num whitespace-nowrap ${
+                            diffDur === null
+                              ? 'text-slate-500'
+                              : isDurMet
+                              ? 'text-emerald-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {diffDur !== null
+                            ? `${formatHaulingSignedDec2(diffDur)} menit`
+                            : '–'}
+                        </td>
+                        <td className="py-2 px-3.5 text-right font-mono-num text-slate-200 whitespace-nowrap">
+                          {row.isYearlyMonth
+                            ? `${formatHaulingInt(row.jumlahKa)} KA`
+                            : `${formatHaulingInt(row.jumlahKa)} KA`}
+                        </td>
+                        <td className="py-2 px-3.5 text-right font-mono-num text-slate-200 whitespace-nowrap">
+                          {row.jumlahKa > 0 ? `${formatHaulingTon(row.totalTonase)} Ton` : '–'}
                         </td>
                         <td className="py-2 px-3.5 text-right font-mono-num text-slate-200 whitespace-nowrap">
                           {row.avgFd !== null ? `${formatHaulingDec2(row.avgFd)} FD` : '–'}

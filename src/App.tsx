@@ -374,7 +374,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    document.title = 'DASHBOARD LOADING BARGE PT. WBS';
+    document.title = 'DASHBOARD OPERATION WBS';
   }, []);
 
   return (
@@ -399,7 +399,7 @@ export default function App() {
                 }}
                 className="text-lg font-extrabold tracking-tight text-slate-50 whitespace-nowrap leading-tight"
               >
-                DASHBOARD LOADING BARGE
+                DASHBOARD OPERATION WBS
               </a>
               <span className="text-[11px] font-semibold tracking-wider text-slate-400 uppercase mt-0.5">
                 PT. WAHANA BARA SENTOSA

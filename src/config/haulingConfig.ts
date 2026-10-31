@@ -18,8 +18,10 @@ export interface HaulingConfig {
   planDurasiMenit: number;
   /** Target jumlah truk Flat Deck (FD) per KA */
   planFdPerKa: number;
-  /** Standar tonase per rangkaian KA (MT) untuk menurunkan Plan KA/hari = Plan Ton Harian / 2.800 */
+  /** Standar tonase per rangkaian KA (MT) */
   planTonPerKa: number;
+  /** Target jumlah rangkaian KA yang dibongkar per hari (KA/hari) */
+  planKaPerHari: number;
   /** Flag arah evaluasi FD: true = Actual >= Plan hijau; false = Actual <= Plan hijau */
   fdHigherIsBetter: boolean;
   /** Ambang batas outlier durasi bongkar KA (menit) untuk fitur toggle exclude outlier */
@@ -45,6 +47,7 @@ export const HAULING_CONFIG: HaulingConfig = {
   planDurasiMenit: 120,
   planFdPerKa: 40,
   planTonPerKa: 2800,
+  planKaPerHari: 7,
   fdHigherIsBetter: true,
   outlierDurationThresholdMinutes: 400,
 };

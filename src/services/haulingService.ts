@@ -343,21 +343,21 @@ function computeCalendarAndPlanForRange(
     cur.setDate(cur.getDate() + 1);
   }
 
-  if (calendarDays === 0 || hasMissingMonthPlan) {
+  if (calendarDays === 0) {
     return {
-      calendarDays,
+      calendarDays: 0,
       planTon: null,
       planKaPeriode: null,
       planKaPerHari: null,
     };
   }
 
-  const planKaPeriode = totalPlanTon / config.planTonPerKa;
-  const planKaPerHari = planKaPeriode / calendarDays;
+  const planKaPerHari = config.planKaPerHari;
+  const planKaPeriode = planKaPerHari * calendarDays;
 
   return {
     calendarDays,
-    planTon: totalPlanTon,
+    planTon: hasMissingMonthPlan ? null : totalPlanTon,
     planKaPeriode,
     planKaPerHari,
   };
@@ -586,12 +586,7 @@ export function computeDailyKa(
       }
     }
 
-    const monthlyPlan = config.planTonPerBulan[monthKey];
-    let planKa: number | null = null;
-    if (monthlyPlan !== undefined && monthlyPlan !== null && monthlyPlan > 0) {
-      const daysInMonth = new Date(year, cur.getMonth() + 1, 0).getDate();
-      planKa = monthlyPlan / daysInMonth / config.planTonPerKa;
-    }
+    const planKa: number | null = config.planKaPerHari;
 
     items.push({
       dateIso,
@@ -678,11 +673,7 @@ export function computeMonthlyKaSummaries(
       }
     }
 
-    const monthlyPlan = config.planTonPerBulan[monthKey];
-    let planKaPerHari: number | null = null;
-    if (monthlyPlan !== undefined && monthlyPlan !== null && monthlyPlan > 0) {
-      planKaPerHari = monthlyPlan / daysInFullMonth / config.planTonPerKa;
-    }
+    const planKaPerHari: number | null = config.planKaPerHari;
 
     summaries.push({
       monthKey,
