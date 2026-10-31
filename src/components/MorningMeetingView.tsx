@@ -89,15 +89,15 @@ export const MorningMeetingView: React.FC<MorningMeetingViewProps> = ({
       <div className="inline-flex items-center gap-2.5 bg-slate-900/90 border border-slate-800 rounded-lg px-4 py-2 shadow-sm">
         <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
         <h2 className="text-sm font-bold tracking-wide text-slate-100">
-          Overview
+          Overview · KPI Loading to Barge
         </h2>
         <span className="text-xs text-slate-400 font-mono-num border-l border-slate-800 pl-2.5">
           Monthly · {matrix.periodLabel.Monthly}
         </span>
       </div>
 
-      {/* Focused Monthly Highlight Strip (4 Primary KPIs with Distinct Vibrant Gradients) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* Focused Monthly Highlight Strip (4 Primary KPIs with Distinct Vibrant Gradients) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Card A: Tonase Loading to Barge — Vibrant Blue Gradient */}
         <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-sky-500 to-blue-700 border border-sky-300/30 rounded-xl p-5 text-white shadow-lg shadow-blue-950/50 flex flex-col justify-between">
           <Ship className="w-14 h-14 text-white/20 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />

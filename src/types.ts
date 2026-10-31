@@ -154,5 +154,94 @@ export interface SheetSyncStatus {
     base2_2026Rows: number;
     mentariRows: number;
     rasioCyRows: number;
+    hauling2026Rows?: number;
   };
 }
+
+export interface HaulingRecord {
+  id: string;
+  rowNumber: number;
+  dateObj: Date;
+  dateIso: string; // 'YYYY-MM-DD'
+  dateStr: string; // e.g. '30-Okt-2026'
+  monthKey: string; // e.g. '2026-10'
+  code: string;
+  cargo: string; // Normalized uppercase cargo without 'PRODUCT '
+  incomingTon: number;
+  noKa: string; // Cleaned string without spaces
+  durasiMenit: number | null; // Null if missing/invalid so excluded from average
+  jumlahFd: number | null; // Null if missing/invalid (e.g. 'MIP') so excluded from average
+  shift: string; // Cleaned string without spaces (e.g. '1', '2', '1>2', '2>1')
+  kendala: string;
+  isOutlierDuration: boolean; // durasiMenit > 400
+}
+
+export interface HaulingPeriodMetrics {
+  period: PeriodType;
+  label: string;
+  startDateIso: string;
+  endDateIso: string;
+  calendarDays: number;
+  hasData: boolean;
+  // 1. Tonase Hauling (MT)
+  planTon: number | null;
+  actualTon: number | null;
+  tonAchievementPct: number | null;
+  // 2. Durasi Bongkar per KA (menit)
+  planDurasi: number;
+  actualDurasi: number | null;
+  selisihDurasi: number | null; // Actual - Plan (positif = Over, negatif = Hemat)
+  outlierCount: number;
+  // 3. Jumlah Truk FD per KA
+  planFd: number;
+  actualFd: number | null;
+  selisihFd: number | null; // Actual - Plan
+  // 4. KA Dibongkar per Hari
+  totalKa: number;
+  planKaPeriode: number | null;
+  planKaPerHari: number | null;
+  actualKaPerHari: number | null;
+  kaAchievementPct: number | null;
+}
+
+export interface HaulingKpiResult {
+  refDateIso: string;
+  refDateLabel: string;
+  excludeOutlierDuration: boolean;
+  totalRows2026: number;
+  byMonthCount: Record<string, number>;
+  periods: Record<PeriodType, HaulingPeriodMetrics>;
+}
+
+export interface DailyKaItem {
+  dateIso: string;
+  dateLabel: string;
+  fullDateLabel: string;
+  monthKey: string;
+  jumlahKa: number;
+  planKa: number | null;
+  totalTonase: number;
+  avgDurasi: number | null;
+  avgDurasiRaw: number | null;
+  avgFd: number | null;
+  kendalaList: string[];
+  hasOutlier: boolean;
+  outlierDetails: string[];
+}
+
+export interface MonthlyKaSummary {
+  monthKey: string;
+  monthLabel: string;
+  fullMonthLabel: string;
+  calendarDays: number;
+  jumlahKa: number;
+  kaPerHari: number;
+  planKaPerHari: number | null;
+  totalTonase: number;
+  avgDurasi: number | null;
+  avgFd: number | null;
+  kendalaList: string[];
+  hasOutlier: boolean;
+  outlierDetails: string[];
+}
+

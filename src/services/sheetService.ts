@@ -519,19 +519,28 @@ function buildMetric(plan: number, actual: number, inverseAchievement = false): 
 }
 
 /**
- * Helper to determine the evaluation anchor date (cutoff date) for a given month filter.
- * - For 'ALL_2026' or '2026-10' (current running month): H-1 (27 Oktober 2026).
+ * Helper to determine the evaluation anchor date (reference date) for a given month filter or custom date.
+ * - Default for 'ALL_2026' or '2026-10': latest data date in 2026 (30 Oktober 2026).
  * - For any other selected month 'YYYY-MM' (e.g., '2026-09' September): the last day of that month (e.g., 30 September 2026).
  */
-export function getAnchorDateForMonth(selectedMonthFilter: string = 'ALL_2026'): Date {
-  if (!selectedMonthFilter || selectedMonthFilter === 'ALL_2026' || selectedMonthFilter === '2026-10') {
-    const today = new Date();
-    const hMinus1 = new Date(today);
-    hMinus1.setDate(hMinus1.getDate() - 1);
-    if (hMinus1.getFullYear() !== 2026 || hMinus1.getMonth() !== 9) {
-      return new Date(2026, 9, 27, 12, 0, 0);
+export function getAnchorDateForMonth(
+  selectedMonthFilter: string = 'ALL_2026',
+  customRefDateIso?: string
+): Date {
+  if (customRefDateIso) {
+    const m = customRefDateIso.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) {
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      if (y === 2026 && mo >= 0 && mo <= 11 && d >= 1 && d <= 31) {
+        return new Date(2026, mo, d, 12, 0, 0);
+      }
     }
-    return new Date(2026, 9, hMinus1.getDate(), 12, 0, 0);
+  }
+
+  if (!selectedMonthFilter || selectedMonthFilter === 'ALL_2026' || selectedMonthFilter === '2026-10') {
+    return new Date(2026, 9, 30, 12, 0, 0);
   }
 
   const parts = selectedMonthFilter.split('-');
@@ -543,15 +552,15 @@ export function getAnchorDateForMonth(selectedMonthFilter: string = 'ALL_2026'):
 
 /**
  * Parses "Meeting Mentari" / "Resume Performance" sheet & BASE records for Executive Morning Meeting KPI Matrix.
- * Dynamically shifts Daily, Weekly, Monthly, and Yearly (YTD) to the end of the selected month
- * (or H-1 for the current running month October 2026).
+ * Dynamically shifts Daily, Weekly, Monthly, and Yearly (YTD) to the reference date (default 30 Oktober 2026).
  */
 export function parseExecutiveMatrix(
   mentariRows: string[][],
   barges2026: BargeRecord[],
-  selectedMonthFilter: string = 'ALL_2026'
+  selectedMonthFilter: string = 'ALL_2026',
+  customRefDateIso?: string
 ): ExecutiveMatrix {
-  const anchorDate = getAnchorDateForMonth(selectedMonthFilter);
+  const anchorDate = getAnchorDateForMonth(selectedMonthFilter, customRefDateIso);
 
   const indoMonthNames = [
     'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
@@ -563,8 +572,10 @@ export function parseExecutiveMatrix(
   const anchorMonth = indoMonthNames[anchorMonthIdx];
   const anchorYear = anchorDate.getFullYear();
 
-  // Weekly: 7 hari berakhir pada anchorDate
-  const weekStart = new Date(anchorYear, anchorMonthIdx, anchorDay - 6, 0, 0, 0, 0);
+  // Weekly: 7 hari berakhir pada anchorDate, tidak melewati 1 Jan 2026
+  const yearStartObj = new Date(anchorYear, 0, 1, 0, 0, 0, 0);
+  const rawWeekStart = new Date(anchorYear, anchorMonthIdx, anchorDay - 6, 0, 0, 0, 0);
+  const weekStart = rawWeekStart < yearStartObj ? yearStartObj : rawWeekStart;
   const weekStartDay = weekStart.getDate();
   const weekStartMonth = indoMonthNames[weekStart.getMonth()];
 

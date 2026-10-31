@@ -41,27 +41,41 @@ import {
   FALLBACK_EFFICIENCY_2026,
   FALLBACK_EXECUTIVE_MATRIX,
 } from './data/fallbackData';
+import { FALLBACK_VOLUME_HAULING_RAW_ROWS } from './data/fallbackHaulingData';
+import { FOCUS_YEAR, HAULING_CONFIG } from './config/haulingConfig';
+import {
+  cleanVolumeHaulingRows,
+  getLatestHaulingDateIso,
+} from './services/haulingService';
 import { MorningMeetingView } from './components/MorningMeetingView';
 import { TurnaroundAnatomyView } from './components/TurnaroundAnatomyView';
+import { TrainUnloadingView } from './components/TrainUnloadingView';
 import { EquipmentEfficiencyView } from './components/EquipmentEfficiencyView';
 import { DataExplorerView } from './components/DataExplorerView';
 import { DataSourceModal } from './components/DataSourceModal';
 
-type MenuTab = 'MORNING_MEETING' | 'TURNAROUND_ANATOMY' | 'EQUIPMENT_EFFICIENCY' | 'DATA_EXPLORER';
+type MenuTab =
+  | 'MORNING_MEETING'
+  | 'TURNAROUND_ANATOMY'
+  | 'TRAIN_UNLOADING'
+  | 'EQUIPMENT_EFFICIENCY'
+  | 'DATA_EXPLORER';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<MenuTab>('MORNING_MEETING');
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('Monthly');
   const [selectedMonthFilter, setSelectedMonthFilter] = useState<string>('ALL_2026');
   const [dateRangeStart, setDateRangeStart] = useState<string>('2026-01-01');
-  const [dateRangeEnd, setDateRangeEnd] = useState<string>('2026-12-31');
+  const [dateRangeEnd, setDateRangeEnd] = useState<string>(HAULING_CONFIG.defaultRefDateIso);
   const [selectedBargeName, setSelectedBargeName] = useState<string>('ALL');
+  const [excludeOutlierDuration, setExcludeOutlierDuration] = useState<boolean>(false);
 
   // Raw sheet rows state so user can re-map columns dynamically
   const [rawBaseRows, setRawBaseRows] = useState<string[][]>([]);
   const [rawBase2Rows, setRawBase2Rows] = useState<string[][]>([]);
   const [rawMentariRows, setRawMentariRows] = useState<string[][]>([]);
   const [rawRasioRows, setRawRasioRows] = useState<string[][]>([]);
+  const [rawHaulingRows, setRawHaulingRows] = useState<string[][]>(FALLBACK_VOLUME_HAULING_RAW_ROWS);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>(DEFAULT_COLUMN_MAPPING);
 
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
@@ -79,6 +93,7 @@ export default function App() {
       base2_2026Rows: 4585,
       mentariRows: 30,
       rasioCyRows: 22,
+      hauling2026Rows: 1795,
     },
   });
 
@@ -88,19 +103,27 @@ export default function App() {
     setSyncStatus((prev) => ({ ...prev, isSyncing: true, error: null }));
 
     try {
-      const [baseCsv, base2Csv, mentariCsv, rasioCsv] = await Promise.all([
+      const [baseCsv, base2Csv, mentariCsv, rasioCsv, haulingCsv] = await Promise.all([
         fetchSheetCsv(id, 'BASE'),
         fetchSheetCsv(id, 'BASE2'),
-        fetchSheetCsv(id, 'Meeting Mentari').catch(() => fetchSheetCsv(id, 'Resume Performance')),
+        fetchSheetCsv(id, 'Resume Performance').catch(() => fetchSheetCsv(id, 'Meeting Mentari')),
         fetchSheetCsv(id, 'Rasio CY').catch(() => []),
+        fetchSheetCsv(id, 'Volume Hauling').catch(() => []),
       ]);
 
       setRawBaseRows(baseCsv);
       setRawBase2Rows(base2Csv);
       setRawMentariRows(mentariCsv);
       setRawRasioRows(rasioCsv);
+      if (haulingCsv && haulingCsv.length > 10) {
+        setRawHaulingRows(haulingCsv);
+      }
 
       const processed = processBaseAndBase2(baseCsv, base2Csv, DEFAULT_COLUMN_MAPPING);
+      const cleanedHauling = cleanVolumeHaulingRows(
+        haulingCsv && haulingCsv.length > 10 ? haulingCsv : FALLBACK_VOLUME_HAULING_RAW_ROWS,
+        FOCUS_YEAR
+      );
       const nowStr = new Date().toLocaleTimeString('id-ID', {
         hour: '2-digit',
         minute: '2-digit',
@@ -121,6 +144,7 @@ export default function App() {
           base2_2026Rows: processed.base2_2026Count,
           mentariRows: mentariCsv.length,
           rasioCyRows: rasioCsv.length,
+          hauling2026Rows: cleanedHauling.length,
         },
       });
     } catch (err) {
@@ -138,6 +162,18 @@ export default function App() {
   useEffect(() => {
     syncFromGoogleSpreadsheet(DEFAULT_SPREADSHEET_ID);
   }, [syncFromGoogleSpreadsheet]);
+
+  // Clean Volume Hauling once at the data layer (strictly FOCUS_YEAR = 2026)
+  const hauling2026 = useMemo(() => {
+    const cleaned = cleanVolumeHaulingRows(rawHaulingRows, FOCUS_YEAR);
+    if (cleaned.length > 0) return cleaned;
+    return cleanVolumeHaulingRows(FALLBACK_VOLUME_HAULING_RAW_ROWS, FOCUS_YEAR);
+  }, [rawHaulingRows]);
+
+  const latestHaulingDateIso = useMemo(
+    () => getLatestHaulingDateIso(hauling2026, FOCUS_YEAR),
+    [hauling2026]
+  );
 
   // Process 2026 Barges, Executive Matrix, and Efficiency Records
   const { barges2026, rawBaseHeaders, rawBase2Headers } = useMemo(() => {
@@ -189,12 +225,25 @@ export default function App() {
     };
   }, [rawBaseRows, rawBase2Rows, columnMapping]);
 
+  // Determine active Reference Date (clamped within 2026, default = latest 2026 hauling date 2026-10-30)
+  const activeRefDateIso = useMemo(() => {
+    if (dateRangeEnd && dateRangeEnd.startsWith('2026-')) {
+      return dateRangeEnd;
+    }
+    return latestHaulingDateIso || HAULING_CONFIG.defaultRefDateIso;
+  }, [dateRangeEnd, latestHaulingDateIso]);
+
   const executiveMatrix: ExecutiveMatrix = useMemo(() => {
     if (barges2026.length > 0 || rawMentariRows.length > 5) {
-      return parseExecutiveMatrix(rawMentariRows, barges2026, selectedMonthFilter);
+      return parseExecutiveMatrix(
+        rawMentariRows,
+        barges2026,
+        selectedMonthFilter,
+        activeRefDateIso
+      );
     }
     return FALLBACK_EXECUTIVE_MATRIX;
-  }, [rawMentariRows, barges2026, selectedMonthFilter]);
+  }, [rawMentariRows, barges2026, selectedMonthFilter, activeRefDateIso]);
 
   const efficiencyRecords: EfficiencyRecord[] = useMemo(() => {
     if (rawRasioRows.length > 2) {
@@ -233,8 +282,12 @@ export default function App() {
       const mIdx = b.dateObj.getMonth();
       map.set(b.monthKey, `${monthNames[mIdx]} 2026`);
     }
+    for (const h of hauling2026) {
+      const mIdx = h.dateObj.getMonth();
+      map.set(h.monthKey, `${monthNames[mIdx]} 2026`);
+    }
     return Array.from(map.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [barges2026]);
+  }, [barges2026, hauling2026]);
 
   // Apply Global Filters (Date Range & Barge Name)
   const filteredBarges = useMemo(() => {
@@ -260,26 +313,32 @@ export default function App() {
     return `${yyyy}-${mm}-${dd}`;
   };
 
-  const applyDateBoundsForPeriodAndMonth = useCallback((p: PeriodType, mKey: string) => {
-    const anchor = getAnchorDateForMonth(mKey);
-    const anchorIso = formatIsoDate(anchor);
+  const applyDateBoundsForPeriodAndMonth = useCallback(
+    (p: PeriodType, mKey: string) => {
+      const anchor =
+        mKey === 'ALL_2026' || mKey === '2026-10'
+          ? getAnchorDateForMonth(mKey, latestHaulingDateIso)
+          : getAnchorDateForMonth(mKey);
+      const anchorIso = formatIsoDate(anchor);
 
-    if (p === 'Daily') {
-      setDateRangeStart(anchorIso);
-      setDateRangeEnd(anchorIso);
-    } else if (p === 'Weekly') {
-      const weekStart = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 6);
-      setDateRangeStart(formatIsoDate(weekStart));
-      setDateRangeEnd(anchorIso);
-    } else if (p === 'Monthly') {
-      const monthStart = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-01`;
-      setDateRangeStart(monthStart);
-      setDateRangeEnd(anchorIso);
-    } else if (p === 'Yearly') {
-      setDateRangeStart(`${anchor.getFullYear()}-01-01`);
-      setDateRangeEnd(anchorIso);
-    }
-  }, []);
+      if (p === 'Daily') {
+        setDateRangeStart(anchorIso);
+        setDateRangeEnd(anchorIso);
+      } else if (p === 'Weekly') {
+        const weekStart = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - 6);
+        setDateRangeStart(formatIsoDate(weekStart));
+        setDateRangeEnd(anchorIso);
+      } else if (p === 'Monthly') {
+        const monthStart = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}-01`;
+        setDateRangeStart(monthStart);
+        setDateRangeEnd(anchorIso);
+      } else if (p === 'Yearly') {
+        setDateRangeStart(`${anchor.getFullYear()}-01-01`);
+        setDateRangeEnd(anchorIso);
+      }
+    },
+    [latestHaulingDateIso]
+  );
 
   // Handle switching periods so Daily, Weekly, Monthly, and Yearly automatically synchronize dates for the selected month
   const handleSelectPeriod = (p: PeriodType) => {
@@ -292,7 +351,7 @@ export default function App() {
     setSelectedPeriod('Monthly');
     if (mKey === 'ALL_2026') {
       setDateRangeStart('2026-01-01');
-      setDateRangeEnd('2026-12-31');
+      setDateRangeEnd(latestHaulingDateIso || HAULING_CONFIG.defaultRefDateIso);
     } else {
       applyDateBoundsForPeriodAndMonth('Monthly', mKey);
     }
@@ -302,7 +361,7 @@ export default function App() {
     setSelectedMonthFilter('ALL_2026');
     setSelectedPeriod('Monthly');
     setDateRangeStart('2026-01-01');
-    setDateRangeEnd('2026-12-31');
+    setDateRangeEnd(latestHaulingDateIso || HAULING_CONFIG.defaultRefDateIso);
     setSelectedBargeName('ALL');
   };
 
@@ -348,7 +407,7 @@ export default function App() {
             </div>
           </div>
 
-          {/* Zone 2: 4 Navigation Links (Desktop) */}
+          {/* Zone 2: 5 Navigation Links (Desktop) */}
           <nav className="hidden xl:flex items-center gap-2 text-xs font-semibold">
             <button
               onClick={() => setActiveTab('MORNING_MEETING')}
@@ -358,7 +417,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
               }`}
             >
-              01. Summary
+              01. Loading Barge
             </button>
             <button
               onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
@@ -371,6 +430,16 @@ export default function App() {
               02. Turnaround &amp; Delay
             </button>
             <button
+              onClick={() => setActiveTab('TRAIN_UNLOADING')}
+              className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
+                activeTab === 'TRAIN_UNLOADING'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-900/50'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
+              }`}
+            >
+              03. Train Unloading
+            </button>
+            <button
               onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
               className={`px-3.5 py-2 rounded-lg transition-all whitespace-nowrap shrink-0 ${
                 activeTab === 'EQUIPMENT_EFFICIENCY'
@@ -378,7 +447,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
               }`}
             >
-              03. Fuel &amp; HM Ratio
+              04. Fuel &amp; HM Ratio
             </button>
             <button
               onClick={() => setActiveTab('DATA_EXPLORER')}
@@ -388,7 +457,7 @@ export default function App() {
                   : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900'
               }`}
             >
-              04. Data Explorer
+              05. Data Explorer
             </button>
           </nav>
 
@@ -416,7 +485,7 @@ export default function App() {
                     activeTab === 'MORNING_MEETING' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  01. Summary
+                  01. Loading Barge
                 </button>
                 <button
                   onClick={() => setActiveTab('TURNAROUND_ANATOMY')}
@@ -427,12 +496,20 @@ export default function App() {
                   02. Turnaround &amp; Delay
                 </button>
                 <button
+                  onClick={() => setActiveTab('TRAIN_UNLOADING')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                    activeTab === 'TRAIN_UNLOADING' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  03. Train Unloading
+                </button>
+                <button
                   onClick={() => setActiveTab('EQUIPMENT_EFFICIENCY')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
                     activeTab === 'EQUIPMENT_EFFICIENCY' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  03. Fuel &amp; HM Ratio
+                  04. Fuel &amp; HM Ratio
                 </button>
                 <button
                   onClick={() => setActiveTab('DATA_EXPLORER')}
@@ -440,11 +517,11 @@ export default function App() {
                     activeTab === 'DATA_EXPLORER' ? 'bg-sky-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  04. Data Explorer
+                  05. Data Explorer
                 </button>
               </div>
 
-            {/* Global Filter Controls: Bulan 2026, Rentang Tanggal, Nama Tongkang */}
+            {/* Global Filter Controls: Bulan 2026, Rentang Tanggal (Ref Date), Nama Tongkang */}
             <div className="flex flex-wrap items-center gap-2.5 text-xs w-full xl:w-auto justify-between xl:justify-start">
               {/* Filter Bulan 2026 */}
               <div className="flex items-center gap-1.5">
@@ -454,7 +531,7 @@ export default function App() {
                   onChange={(e) => handleMonthFilterChange(e.target.value)}
                   className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-100 font-medium focus:outline-none focus:border-sky-500"
                 >
-                  <option value="ALL_2026">Semua Bulan 2026 ({barges2026.length} Barge)</option>
+                  <option value="ALL_2026">Semua Bulan 2026 ({barges2026.length} Barge · {hauling2026.length} KA)</option>
                   {availableMonths.map(([key, label]) => (
                     <option key={key} value={key}>
                       {label}
@@ -463,7 +540,7 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Filter Rentang Tanggal */}
+              {/* Filter Rentang Tanggal (dibatasi 2026, Tanggal Akhir = Tanggal Referensi) */}
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400 whitespace-nowrap">Tanggal:</span>
                 <input
@@ -481,6 +558,7 @@ export default function App() {
                   min="2026-01-01"
                   max="2026-12-31"
                   onChange={(e) => setDateRangeEnd(e.target.value)}
+                  title="Tanggal Referensi Evaluasi (2026)"
                   className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-slate-200 font-mono-num focus:outline-none focus:border-sky-500"
                 />
               </div>
@@ -505,7 +583,7 @@ export default function App() {
               <button
                 onClick={handleResetFilters}
                 className="px-2.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-lg flex items-center gap-1 transition-colors whitespace-nowrap shrink-0"
-                title="Reset Filter ke Default 2026"
+                title="Reset Filter ke Default 2026 (30 Okt 2026)"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Reset</span>
@@ -516,9 +594,9 @@ export default function App() {
             <div className="hidden 2xl:flex items-center gap-2 text-xs text-slate-400 font-mono-num">
               <span>{syncStatus.isLive ? 'Google Sheet Live' : 'Snapshot Mode'}</span>
               <span>·</span>
-              <span>BASE 2026: {syncStatus.counts.base2026Rows} Barge</span>
+              <span>HAULING 2026: {hauling2026.length} KA</span>
               <span>·</span>
-              <span>BASE2: {syncStatus.counts.base2_2026Rows} Log</span>
+              <span>BASE 2026: {syncStatus.counts.base2026Rows} Barge</span>
               <span>·</span>
               <button
                 onClick={() => syncFromGoogleSpreadsheet(syncStatus.spreadsheetId)}
@@ -545,6 +623,15 @@ export default function App() {
 
         {activeTab === 'TURNAROUND_ANATOMY' && (
           <TurnaroundAnatomyView barges={filteredBarges} />
+        )}
+
+        {activeTab === 'TRAIN_UNLOADING' && (
+          <TrainUnloadingView
+            rows={hauling2026}
+            refDateIso={activeRefDateIso}
+            excludeOutlierDuration={excludeOutlierDuration}
+            onToggleExcludeOutlier={setExcludeOutlierDuration}
+          />
         )}
 
         {activeTab === 'EQUIPMENT_EFFICIENCY' && (
